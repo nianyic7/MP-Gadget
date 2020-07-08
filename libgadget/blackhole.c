@@ -1101,6 +1101,16 @@ blackhole_feedback_ngbiter(TreeWalkQueryBHFeedback * I,
         O->BH_CountProgs += BHP(other).CountProgs;
         /* Leave the swallowed BH mass around
          * so we can work out mass at merger. */
+        /**************************************************/
+
+        if (I->BH_Mass + BHP(other).Mass < 5e-3) {
+            O->Mass += BHP(other).Mass;
+        }
+        else {
+            O->Mass += (P[other].Mass);
+        }
+        /**************************************************/
+
         O->Mass += (P[other].Mass);
         O->BH_Mass += (BHP(other).Mass);
         /* Conserve momentum during accretion*/
@@ -1274,6 +1284,11 @@ void blackhole_make_one(int index) {
     BHP(child).FormationTime = All.Time;
     BHP(child).SwallowID = (MyIDType) -1;
     BHP(child).Density = 0;
+    
+    /****************************************/
+    /* Larger Dynamical Mass */
+    P[child].Mass = 5e-3;
+    /****************************************/
 
     /* It is important to initialize MinPotPos to the current position of
      * a BH to avoid drifting to unknown locations (0,0,0) immediately
