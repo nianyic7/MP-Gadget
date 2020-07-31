@@ -1111,7 +1111,7 @@ blackhole_feedback_ngbiter(TreeWalkQueryBHFeedback * I,
         }
         /**************************************************/
 
-        O->Mass += (P[other].Mass);
+        // O->Mass += (P[other].Mass);
         O->BH_Mass += (BHP(other).Mass);
         /* Conserve momentum during accretion*/
         int d;
