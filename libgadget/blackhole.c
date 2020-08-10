@@ -54,6 +54,10 @@ typedef struct {
 typedef struct {
     TreeWalkResultBase base;
     MyFloat BH_MinPotPos[3];
+    /******************************/
+    MyFloat BH_HaloMinPotPos[3];
+    MyFloat BH_HaloMinPot;
+    /******************************/
     MyFloat BH_MinPotVel[3];
     MyFloat BH_MinPot;
 
@@ -165,9 +169,11 @@ struct BHPriv {
      * in the feedback treewalk*/
     MyFloat * BH_SurroundingDensity;
     MyFloat (*BH_SurroundingVel)[3];
+    MyFloat * HaloMinPot;
 
     MyFloat * BH_DFAllMass;
     MyFloat * BH_DFFracMass;
+    
 
     struct dfdata * DFdata;
     size_t * NPLeft;
@@ -232,6 +238,8 @@ struct BHinfo{
     double BH_DFAccel[3]; // changed to fractional acc
     double BH_DragAccel[3];
     double BH_GravAccel[3];
+
+    MyFloat BH_HaloMinPotPos[3];
 
     /**************************************************************/
 
@@ -409,6 +417,7 @@ collect_BH_info(int * ActiveParticle,int NumActiveParticle, struct BHPriv *priv,
             info.Pos[k] = P[p_i].Pos[k] - PartManager->CurrentParticleOffset[k];
             info.BH_Vel[k] = P[p_i].Vel[k];
             info.BH_DFAccel[k] = BHP(p_i).DFAccel[k];
+            info.BH_HaloMinPotPos[k] = BHP(p_i).BH_HaloMinPotPos[k] - PartManager->CurrentParticleOffset[k];
         }
 
         /****************************************************************************/
@@ -533,6 +542,7 @@ blackhole(const ActiveParticles * act, ForceTree * tree, FILE * FdBlackHoles, FI
     /* Local to this treewalk*/
     priv->BH_Entropy = mymalloc("BH_Entropy", SlotsManager->info[5].size * sizeof(MyFloat));
     priv->BH_SurroundingGasVel = (MyFloat (*) [3]) mymalloc("BH_SurroundVel", 3* SlotsManager->info[5].size * sizeof(priv->BH_SurroundingGasVel[0]));
+    priv->BH_HaloMinPot = mymalloc("BH_HaloMinPot", SlotsManager->info[5].size * sizeof(MyFloat));
 
 
     
@@ -699,7 +709,7 @@ blackhole(const ActiveParticles * act, ForceTree * tree, FILE * FdBlackHoles, FI
     myfree(priv->BH_SurroundingVel);
 
     /*****************************************************************/
-
+    myfree(priv->BH_HaloMinPot);
     myfree(priv->BH_SurroundingGasVel);
     myfree(priv->BH_Entropy);
     myfree(priv->MinPot);
@@ -915,7 +925,8 @@ static void
 blackhole_dynfric_ngbiter(TreeWalkQueryBHDynfric * I,
         TreeWalkResultBHDynfric * O,
         TreeWalkNgbIterBHDynfric * iter,
-        LocalTreeWalk * lv){
+        LocalTreeWalk * lv)
+{
 
    if(iter->base.other == -1) {
         iter->base.mask = 1 + 2 + 16; // Gas/DM/Star
@@ -959,9 +970,14 @@ blackhole_accretion_preprocess(int n, TreeWalk * tw)
 {
     int j;
     BH_GET_PRIV(tw)->MinPot[P[n].PI] = P[n].Potential;
+    BH_GET_PRIV(tw)->HaloMinPot[P[n].PI] = P[n].Potential;
 
     for(j = 0; j < 3; j++) {
         BHP(n).MinPotPos[j] = P[n].Pos[j];
+    }
+
+    for(j = 0; j < 3; j++) {
+        BHP(n).HaloMinPotPos[j] = P[n].Pos[j];
     }
 }
 
@@ -1045,9 +1061,12 @@ blackhole_accretion_ngbiter(TreeWalkQueryBHAccretion * I,
         O->BH_minTimeBin = TIMEBINS;
 
         O->BH_MinPot = BHPOTVALUEINIT;
+        O->BH_HaloMinPot = BHPOTVALUEINIT;
+
         int d;
         for(d = 0; d < 3; d++) {
             O->BH_MinPotPos[d] = I->base.Pos[d];
+            O->BH_HaloMinPotPos[d] = I->base.Pos[d];
         }
         double hsearch;
         hsearch = decide_hsearch(I->Hsml);
@@ -1088,6 +1107,21 @@ blackhole_accretion_ngbiter(TreeWalkQueryBHAccretion * I,
             }
         }
     }
+
+    /********************************************/
+    /* Find min pot pos within halo */
+    if(r < 10)
+    {
+        if(P[other].Potential < O->BH_HaloMinPot)
+        {
+            int d;
+            O->BH_HaloMinPot = P[other].Potential;
+            for(d = 0; d < 3; d++) {
+                O->BH_HaloMinPotPos[d] = P[other].Pos[d];
+            }
+        }
+    }
+    /*********************************************/
 
     /* Accretion / merger doesn't do self interaction */
     if(P[other].ID == I->ID) return;
@@ -1386,6 +1420,9 @@ blackhole_accretion_reduce(int place, TreeWalkResultBHAccretion * remote, enum T
 {
     int k;
     MyFloat * MinPot = BH_GET_PRIV(tw)->MinPot;
+   /****************************************************************************/
+    MyFloat * HaloMinPot = BH_GET_PRIV(tw)->HaloMinPot;
+   /****************************************************************************/
     int PI = P[place].PI;
     if(MinPot[PI] > remote->BH_MinPot)
     {
@@ -1397,6 +1434,20 @@ blackhole_accretion_reduce(int place, TreeWalkResultBHAccretion * remote, enum T
             BHP(place).MinPotVel[k] = remote->BH_MinPotVel[k];
         }
     }
+
+   /****************************************************************************/
+    if(HaloMinPot[PI] > remote->BH_HaloMinPot)
+    {
+        HaloMinPot[PI] = remote->BH_HaloMinPot;
+        for(k = 0; k < 3; k++) {
+            BHP(place).HaloMinPotPos[k] = remote->BH_HaloMinPotPos[k];
+        }
+    }
+   /****************************************************************************/
+
+
+
+
     if (mode == 0 || BHP(place).minTimeBin > remote->BH_minTimeBin) {
         BHP(place).minTimeBin = remote->BH_minTimeBin;
     }
@@ -1522,6 +1573,7 @@ void blackhole_make_one(int index) {
     int j;
     for(j = 0; j < 3; j++) {
         BHP(child).MinPotPos[j] = P[child].Pos[j];
+        BHP(child).HaloMinPotPos[j] = P[child].Pos[j];
     }
     BHP(child).JumpToMinPot = 0;
 
