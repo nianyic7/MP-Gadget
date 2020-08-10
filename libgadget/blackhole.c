@@ -417,7 +417,7 @@ collect_BH_info(int * ActiveParticle,int NumActiveParticle, struct BHPriv *priv,
             info.Pos[k] = P[p_i].Pos[k] - PartManager->CurrentParticleOffset[k];
             info.BH_Vel[k] = P[p_i].Vel[k];
             info.BH_DFAccel[k] = BHP(p_i).DFAccel[k];
-            info.BH_HaloMinPotPos[k] = BHP(p_i).BH_HaloMinPotPos[k] - PartManager->CurrentParticleOffset[k];
+            info.BH_HaloMinPotPos[k] = BHP(p_i).HaloMinPotPos[k] - PartManager->CurrentParticleOffset[k];
         }
 
         /****************************************************************************/
@@ -542,7 +542,7 @@ blackhole(const ActiveParticles * act, ForceTree * tree, FILE * FdBlackHoles, FI
     /* Local to this treewalk*/
     priv->BH_Entropy = mymalloc("BH_Entropy", SlotsManager->info[5].size * sizeof(MyFloat));
     priv->BH_SurroundingGasVel = (MyFloat (*) [3]) mymalloc("BH_SurroundVel", 3* SlotsManager->info[5].size * sizeof(priv->BH_SurroundingGasVel[0]));
-    priv->BH_HaloMinPot = mymalloc("BH_HaloMinPot", SlotsManager->info[5].size * sizeof(MyFloat));
+    priv->HaloMinPot = mymalloc("BH_HaloMinPot", SlotsManager->info[5].size * sizeof(MyFloat));
 
 
     
@@ -709,7 +709,7 @@ blackhole(const ActiveParticles * act, ForceTree * tree, FILE * FdBlackHoles, FI
     myfree(priv->BH_SurroundingVel);
 
     /*****************************************************************/
-    myfree(priv->BH_HaloMinPot);
+    myfree(priv->HaloMinPot);
     myfree(priv->BH_SurroundingGasVel);
     myfree(priv->BH_Entropy);
     myfree(priv->MinPot);
