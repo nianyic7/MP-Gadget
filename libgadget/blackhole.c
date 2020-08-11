@@ -1343,7 +1343,7 @@ void blackhole_make_one(int index) {
     int j;
     for(j = 0; j < 3; j++) {
         BHP(child).MinPotPos[j] = P[child].Pos[j];
-        HP(child).HaloMinPotPos[j] = P[child].Pos[j];
+        BHP(child).HaloMinPotPos[j] = P[child].Pos[j];
     }
     BHP(child).JumpToMinPot = 0;
 
