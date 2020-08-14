@@ -1018,21 +1018,24 @@ blackhole_feedback_postprocess(int n, TreeWalk * tw)
             bhvel += pow(P[n].Vel[j] - BH_GET_PRIV(tw)->BH_SurroundingVel[PI][j], 2);
         }
         bhvel = sqrt(bhvel);
+        /* From now on everything is in physical unit */
+        bhvel /= All.cf.a;
+        double surr_rho_prop = BH_GET_PRIV(tw)->BH_SurroundingDensity[PI] * All.cf.a3inv;
 
         if (bhvel > c_over_sqrt2)
             bmin = 2. * All.G * P[n].Mass / pow(LIGHTCGS * All.UnitVelocity_in_cm_per_s, 2);
         else
             bmin = All.G * P[n].Mass / pow(bhvel, 2);
+        bmax = FORCE_SOFTENING(0, 1) / 2.8 * All.cf.a; 
 
-        bmax = FORCE_SOFTENING(0, 1) / 2.8; 
         log_lam = log(bmax/bmin);
-        rho_frac =   BH_GET_PRIV(tw)->BH_DFFracMass[PI] / BH_GET_PRIV(tw)->BH_DFAllMass[PI] * BH_GET_PRIV(tw)->BH_SurroundingDensity[PI];
+        rho_frac =   BH_GET_PRIV(tw)->BH_DFFracMass[PI] / BH_GET_PRIV(tw)->BH_DFAllMass[PI] * surr_rho_prop;
 
-        /* Simplified Version from Tremmel 2015 Eq. (3) */
+        /* From Tremmel 2015 Eq. (3) */
         for(int j = 0; j < 3; j++) 
         {
-            BHP(n).DFAccel[j] = - 4. * M_PI * All.G * All.G * P[n].Mass * rho_frac * 
-            log_lam * (P[n].Vel[j] - BH_GET_PRIV(tw)->BH_SurroundingVel[PI][j]) / pow(bhvel, 3);
+            BHP(n).DFAccel[j] = -  All.cf.a * All.cf.a * 4. * M_PI * All.G * All.G * P[n].Mass * rho_frac * 
+            log_lam * (P[n].Vel[j] - BH_GET_PRIV(tw)->BH_SurroundingVel[PI][j]) / All.cf.a / pow(bhvel, 3);
             P[n].GravAccel[j]  += blackhole_params.BH_DFBoostFactor * BHP(n).DFAccel[j]; // Add a boost factor
         }
     }
