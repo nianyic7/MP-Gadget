@@ -690,9 +690,8 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
         }
         bhvel = sqrt(bhvel);
 
-        /* There is no parameter in physical unit, so I kept everything in code unit */
-
-        x = sqrt(bhvel) / sqrt(2) / (BH_GET_PRIV(tw)->BH_SurroundingRmsVel[PI] / 3);
+        /* This is dimensionless, so keep everything in code unit */
+        x = bhvel / sqrt(2) / (BH_GET_PRIV(tw)->BH_SurroundingRmsVel[PI] / 3);
         /* First term is aproximation of the error function */
         f_of_x = x / fabs(x) * sqrt(1 - exp(-x * x * (4 / M_PI + a_erf * x * x) 
             / (1 + a_erf * x * x))) - 2 * x / sqrt(M_PI) * exp(-x * x);
@@ -700,16 +699,18 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
         if (f_of_x < 0)
             f_of_x = 0;
 
+        /* Now we go to physical unit */
+        bhvel /= All.cf.a;
+        double surr_rho_prop = BH_GET_PRIV(tw)->BH_SurroundingDensity[PI] * All.cf.a3inv;
         lambda = 1. + blackhole_params.BH_DFbmax * pow(bhvel,2) / All.G / P[n].Mass;
 
         for(int j = 0; j < 3; j++) 
-        {
-            BHP(n).DFAccel[j] = - 4. * M_PI * All.G * All.G * P[n].Mass * BH_GET_PRIV(tw)->BH_SurroundingDensity[PI] * 
-            log(lambda) * f_of_x * (P[n].Vel[j] - BH_GET_PRIV(tw)->BH_SurroundingVel[PI][j]) / pow(bhvel, 3);
-            P[n].GravAccel[j]  += blackhole_params.BH_DFBoostFactor * BHP(n).DFAccel[j]; // Add a boost factor
+
+        {  /* Now back to code unit */
+            BHP(n).DFAccel[j] = - All.cf.a * All.cf.a * 4. * M_PI * All.G * All.G * P[n].Mass * surr_rho_prop * 
+            log(lambda) * f_of_x * (P[n].Vel[j] - BH_GET_PRIV(tw)->BH_SurroundingVel[PI][j]) / All.cf.a / pow(bhvel, 3);
+            P[n].GravAccel[j]  +=  blackhole_params.BH_DFBoostFactor * BHP(n).DFAccel[j]; // Add a boost factor
         }
-        message(0,"x=%e, log(lambda)=%e, fof_x=%e, Mbh=%e, ratio=%e \n",
-           x,log(lambda),f_of_x,P[n].Mass,BHP(n).DFAccel[0]/P[n].GravAccel[0]);
     }
     else
     {   
