@@ -53,6 +53,7 @@ struct bh_particle_data {
     /* Stores the minimum timebins of all black hole neighbours.
      * The black hole timebin is then set to this.*/
     int minTimeBin;
+    int encounter; /* mark the event when BH encounters another BH */
 };
 
 /*Data for each star particle*/
