@@ -121,7 +121,6 @@ typedef struct {
     MyFloat SurroundingVel[3];
     MyFloat SurroundingDensity;
     MyFloat Vel[3];
-    MyFloat Mass;
     /*************************************************************************/
 
 } TreeWalkQueryBHFeedback;
