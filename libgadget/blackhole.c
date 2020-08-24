@@ -128,7 +128,8 @@ typedef struct {
 typedef struct {
     TreeWalkResultBase base;
     MyFloat Mass;
-    MyFloat     MyFloat Hsml;AccretedMomentum[3];
+    MyFloat Hsml;
+    MyFloat AccretedMomentum[3];
     MyFloat BH_Mass;
     int BH_CountProgs;
     /*************************************************************************/
