@@ -1492,7 +1492,7 @@ blackhole_accretion_reduce(int place, TreeWalkResultBHAccretion * remote, enum T
             BHP(place).MinPotVel[k] = remote->BH_MinPotVel[k];
         }
     }
-
+    BHP(place).encounter = remote->encounter;
    /****************************************************************************/
     if(HaloMinPot[PI] > remote->BH_HaloMinPot)
     {
@@ -1525,6 +1525,8 @@ blackhole_accretion_copy(int place, TreeWalkQueryBHAccretion * I, TreeWalk * tw)
     for(k = 0; k < 3; k++)
     {
         I->Vel[k] = P[place].Vel[k];
+        I->Accel[k] = P[place].GravAccel[k] + P[place].GravPM[k] + BHP(place).DFAccel[k];
+        I->Pos[k] = P[place].Pos[k];
     }
     I->Hsml = P[place].Hsml;
     I->Mass = P[place].Mass;
