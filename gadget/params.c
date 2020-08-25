@@ -217,9 +217,6 @@ create_gadget_parameter_set()
 
     static ParameterEnum BlackHoleFeedbackMethodEnum [] = {
         {"mass", BH_FEEDBACK_MASS},
-
-    static ParameterEnum BlackHoleFeedbackMethodEnum [] = {
-        {"mass", BH_FEEDBACK_MASS},
         {"volume", BH_FEEDBACK_VOLUME},
         {"tophat", BH_FEEDBACK_TOPHAT},
         {"spline", BH_FEEDBACK_SPLINE},
