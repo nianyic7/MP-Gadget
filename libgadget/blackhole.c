@@ -32,7 +32,7 @@ struct BlackholeParams
     double SeedBlackHoleMass;	/*!< Seed black hole mass */
     double BlackHoleEddingtonFactor;	/*! Factor above Eddington */
     int BlackHoleRepositionEnabled; /* If true, enable repositioning the BH to the potential minimum*/
-    
+    double SeedBHDynMass; /* The initial dynamic mass of BH particle */
     /**********************************************************************/
 
     int BH_DynFrictionMethod;/*0 for off; 1 for Star Only; 2 for DM+Star; 3 for DM+Star+Gas */
@@ -113,6 +113,7 @@ typedef struct {
     MyIDType ID;
     MyFloat FeedbackEnergy;
     MyFloat FeedbackWeightSum;
+    MyFloat Mass;
 
 
 } TreeWalkQueryBHFeedback;
@@ -233,6 +234,7 @@ void set_blackhole_params(ParameterSet * ps)
 
         blackhole_params.BlackHoleFeedbackMethod = param_get_enum(ps, "BlackHoleFeedbackMethod");
         blackhole_params.BlackHoleRepositionEnabled = param_get_int(ps, "BlackHoleRepositionEnabled");
+        blackhole_params.SeedBHDynMass = param_get_double(ps,"SeedBHDynMass");
         /***********************************************************************************/
         blackhole_params.BH_DynFrictionMethod = param_get_int(ps, "BH_DynFrictionMethod");
         blackhole_params.BH_DFBoostFactor = param_get_int(ps, "BH_DFBoostFactor");
@@ -1192,17 +1194,18 @@ blackhole_feedback_ngbiter(TreeWalkQueryBHFeedback * I,
         /* Leave the swallowed BH mass around
          * so we can work out mass at merger. */
         /**************************************************/
+        O->BH_Mass += (BHP(other).Mass);
 
-        if (I->BH_Mass + BHP(other).Mass < 5e-3) {
-            O->Mass += BHP(other).Mass;
+        /* Prevent large DynMass accumulates during merger */
+        if (I->BH_Mass + BHP(other).Mass < blackhole_params.SeedBHDynMass) {
+            O->Mass += 0; 
         }
         else {
-            O->Mass += (P[other].Mass);
+            O->Mass += I->BH_Mass + BHP(other).Mass - I->Mass; 
         }
         /**************************************************/
 
-        // O->Mass += (P[other].Mass);
-        O->BH_Mass += (BHP(other).Mass);
+
         /* Conserve momentum during accretion*/
         int d;
         for(d = 0; d < 3; d++)
@@ -1343,6 +1346,7 @@ blackhole_feedback_copy(int i, TreeWalkQueryBHFeedback * I, TreeWalk * tw)
 {
     I->Hsml = P[i].Hsml;
     I->BH_Mass = BHP(i).Mass;
+    I->Mass = P[i].Mass;
     I->ID = P[i].ID;
     int PI = P[i].PI;
 
@@ -1392,10 +1396,6 @@ void blackhole_make_one(int index) {
     BHP(child).SwallowID = (MyIDType) -1;
     BHP(child).Density = 0;
     
-    /****************************************/
-    /* Larger Dynamical Mass */
-    P[child].Mass = 5e-3;
-    /****************************************/
 
     /* It is important to initialize MinPotPos to the current position of
      * a BH to avoid drifting to unknown locations (0,0,0) immediately
@@ -1406,6 +1406,9 @@ void blackhole_make_one(int index) {
         BHP(child).HaloMinPotPos[j] = P[child].Pos[j];
     }
     BHP(child).JumpToMinPot = 0;
+    if (blackhole_params.SeedBHDynMass > 0) {
+        P[child].Mass = blackhole_params.SeedBHDynMass;
+    }
 
     BHP(child).CountProgs = 1;
 }
