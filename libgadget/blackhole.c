@@ -106,10 +106,10 @@ typedef struct {
 typedef struct {
     TreeWalkQueryBase base;
     MyFloat Hsml;
+    MyFloat Mass;
     MyFloat BH_Mass;
     MyIDType ID;
     MyFloat FeedbackEnergy;
-    MyFloat FeedbackWeightSum;
 } TreeWalkQueryBHFeedback;
 
 typedef struct {
