@@ -756,7 +756,7 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
 static int
 blackhole_dynfric_haswork(int n, TreeWalk * tw){
     /*Black hole not being swallowed*/
-    return (P[n].Type == 5) && (!P[n].Swallowed) && (blackhole_params.BH_DynFrictionMethod > 0);
+    return (P[n].Type == 5) && (!P[n].Swallowed);
 }
 
 static void
@@ -869,13 +869,17 @@ blackhole_accretion_postprocess(int i, TreeWalk * tw)
 
     BHP(i).Mass += BHP(i).Mdot * dtime;
 
-    /*************************************************************************/
+       /*************************************************************************/
     
     if(blackhole_params.BH_DRAG > 0){
+        /* a_BH = (v_gas - v_BH) Mdot/M_BH                                   */
+        /* motivated by BH gaining momentum from the accreted gas            */
+        /*c.f.section 3.2,in http://www.tapir.caltech.edu/~phopkins/public/notes_blackholes.pdf */
         double fac = 0;
         if (blackhole_params.BH_DRAG == 1) fac = BHP(i).Mdot/P[i].Mass; 
         if (blackhole_params.BH_DRAG == 2) fac = blackhole_params.BlackHoleEddingtonFactor * meddington/BHP(i).Mass;
         for(k = 0; k < 3; k++) {
+            fac *= All.cf.a; /* dv = acc * kick_fac = acc * a^{-1}dt, therefore acc = a*dv/dt  */
             BHP(i).DragAccel[k] = -(P[i].Vel[k] - BH_GET_PRIV(tw)->BH_SurroundingGasVel[PI][k])*fac;
         }
     }
@@ -884,7 +888,7 @@ blackhole_accretion_postprocess(int i, TreeWalk * tw)
             BHP(i).DragAccel[k] = 0;
         }
     }
-    /*************************************************************************/
+    /*************************************************************************/*******/
 }
 
 static void
