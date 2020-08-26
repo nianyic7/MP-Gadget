@@ -110,6 +110,7 @@ typedef struct {
     MyFloat BH_Mass;
     MyIDType ID;
     MyFloat FeedbackEnergy;
+    MyFloat FeedbackWeightSum;
 } TreeWalkQueryBHFeedback;
 
 typedef struct {
