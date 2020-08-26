@@ -24,13 +24,13 @@
 
 struct BlackholeParams
 {
-    double BlackHoleAccretionFactor;    /*!< Fraction of BH bondi accretion rate */
-    double BlackHoleFeedbackFactor; /*!< Fraction of the black luminosity feed into thermal feedback */
-    enum BlackHoleFeedbackMethod BlackHoleFeedbackMethod;   /*!< method of the feedback*/
-    double BlackHoleFeedbackRadius; /*!< Radius the thermal feedback is fed comoving*/
-    double BlackHoleFeedbackRadiusMaxPhys;  /*!< Radius the thermal cap */
-    double SeedBlackHoleMass;   /*!< Seed black hole mass */
-    double BlackHoleEddingtonFactor;    /*! Factor above Eddington */
+    double BlackHoleAccretionFactor;	/*!< Fraction of BH bondi accretion rate */
+    double BlackHoleFeedbackFactor;	/*!< Fraction of the black luminosity feed into thermal feedback */
+    enum BlackHoleFeedbackMethod BlackHoleFeedbackMethod;	/*!< method of the feedback*/
+    double BlackHoleFeedbackRadius;	/*!< Radius the thermal feedback is fed comoving*/
+    double BlackHoleFeedbackRadiusMaxPhys;	/*!< Radius the thermal cap */
+    double SeedBlackHoleMass;	/*!< Seed black hole mass */
+    double BlackHoleEddingtonFactor;	/*! Factor above Eddington */
     int BlackHoleRepositionEnabled; /* If true, enable repositioning the BH to the potential minimum*/
     
     /**********************************************************************/
@@ -664,6 +664,7 @@ static void
 blackhole_dynfric_postprocess(int n, TreeWalk * tw){   
 
     int PI = P[n].PI;
+    int j;
 
     /***********************************************************************************/
     /* This is Gizmo's implementation of dynamic friction                              */
@@ -812,7 +813,7 @@ blackhole_accretion_postprocess(int i, TreeWalk * tw)
             BH_GET_PRIV(tw)->BH_SurroundingGasVel[PI][k] /= BHP(i).Density;
     }
 
-    double mdot = 0;        /* if no accretion model is enabled, we have mdot=0 */
+    double mdot = 0;		/* if no accretion model is enabled, we have mdot=0 */
 
     double rho = BHP(i).Density;
     double bhvel = 0;
