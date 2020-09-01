@@ -508,7 +508,6 @@ blackhole(const ActiveParticles * act, ForceTree * tree, FILE * FdBlackHoles, FI
     priv->BH_SurroundingDensity = mymalloc("BH_SurroundingDensity", SlotsManager->info[5].size * sizeof(priv->BH_SurroundingDensity));
     /* guard treewalk */
     if (blackhole_params.BH_DynFrictionMethod > 0){
-        printf("DYNFRIC METHOD = %d\n", blackhole_params.BH_DynFrictionMethod);
         treewalk_run(tw_dynfric, act->ActiveParticle, act->NumActiveParticle);
     }
     
@@ -722,13 +721,15 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
         lambda = 1. + blackhole_params.BH_DFbmax * pow(bhvel,2) / All.G / P[n].Mass;
 
         for(j = 0; j < 3; j++) 
-
         {  /* Now back to code unit */
             BHP(n).DFAccel[j] = - All.cf.a * All.cf.a * 4. * M_PI * All.G * All.G * P[n].Mass * surr_rho_prop * 
             log(lambda) * f_of_x * (P[n].Vel[j] - BH_GET_PRIV(tw)->BH_SurroundingVel[PI][j]) / All.cf.a / pow(bhvel, 3);
             BHP(n).DFAccel[j]  *=  blackhole_params.BH_DFBoostFactor; // Add a boost factor
         }
         printf("%.4f, %.4f, %.4f \n", BHP(n).DFAccel[0], BHP(n).DFAccel[1], BHP(n).DFAccel[2]);
+        printf("bhvel = %.2f, f_of_x = %.2f, boost = %d \n", bhvel, f_of_x, blackhole_params.BH_DFBoostFactor);
+        printf("Mass=%.2f, lambda = %.2f, surr_rho = %.2f \n", P[n].Mass, lambda, surr_rho_prop);
+
     }
     else
     {   
