@@ -683,7 +683,7 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
     /*            x = v/sqrt(2)/sigma                                                  */
     /*        sigma = width of the max. distr. of the host system                      */
     /*                (e.g. sigma = v_disp / 3                                         */
-    
+
     if(BH_GET_PRIV(tw)->BH_SurroundingDensity[PI] > 0){ 
         double bhvel;
         double lambda, x, f_of_x;
@@ -699,7 +699,7 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
 
         /* Calculate Coulumb Logarithm */
         bhvel = 0;
-        for(int j = 0; j < 3; j++) 
+        for(j = 0; j < 3; j++) 
         {
             bhvel += pow(P[n].Vel[j] - BH_GET_PRIV(tw)->BH_SurroundingVel[PI][j], 2);
         }
@@ -719,7 +719,7 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
         double surr_rho_prop = BH_GET_PRIV(tw)->BH_SurroundingDensity[PI] * All.cf.a3inv;
         lambda = 1. + blackhole_params.BH_DFbmax * pow(bhvel,2) / All.G / P[n].Mass;
 
-        for(int j = 0; j < 3; j++) 
+        for(j = 0; j < 3; j++) 
 
         {  /* Now back to code unit */
             BHP(n).DFAccel[j] = - All.cf.a * All.cf.a * 4. * M_PI * All.G * All.G * P[n].Mass * surr_rho_prop * 
@@ -730,7 +730,7 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
     else
     {   
         message(0, "Density is zero in DF kernel, kernel may be too small.\n");
-        for(int j = 0; j < 3; j++) 
+        for(j = 0; j < 3; j++) 
         {
             BHP(n).DFAccel[j] = 0;
         }
