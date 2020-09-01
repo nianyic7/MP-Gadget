@@ -507,8 +507,10 @@ blackhole(const ActiveParticles * act, ForceTree * tree, FILE * FdBlackHoles, FI
     priv->BH_SurroundingParticles = mymalloc("BH_SurroundingParticles", SlotsManager->info[5].size * sizeof(priv->BH_SurroundingParticles));
     priv->BH_SurroundingDensity = mymalloc("BH_SurroundingDensity", SlotsManager->info[5].size * sizeof(priv->BH_SurroundingDensity));
     /* guard treewalk */
-    if (blackhole_params.BH_DynFrictionMethod > 0) 
+    if (blackhole_params.BH_DynFrictionMethod > 0){
+        printf("DYNFRIC METHOD = %d\n", blackhole_params.BH_DynFrictionMethod);
         treewalk_run(tw_dynfric, act->ActiveParticle, act->NumActiveParticle);
+    }
     
     /*************************************************************************/
 
