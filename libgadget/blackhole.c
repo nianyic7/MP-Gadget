@@ -727,9 +727,7 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
             BHP(n).DFAccel[j]  *=  blackhole_params.BH_DFBoostFactor; // Add a boost factor
         }
         printf("%.4f, %.4f, %.4f \n", BHP(n).DFAccel[0], BHP(n).DFAccel[1], BHP(n).DFAccel[2]);
-        printf("bhvel = %.2f, f_of_x = %.2f, boost = %d \n", bhvel, f_of_x, blackhole_params.BH_DFBoostFactor);
-        printf("Mass=%.2f, lambda = %.2f, surr_rho = %.2f \n", P[n].Mass, lambda, surr_rho_prop);
-
+        printf("Mass=%.6f, BH_Mass = %.6f \n", P[n].Mass, BHP(n).Mass);
     }
     else
     {   
@@ -1174,12 +1172,9 @@ blackhole_feedback_ngbiter(TreeWalkQueryBHFeedback * I,
          * so we can work out mass at merger. */
 
         O->BH_Mass += (BHP(other).Mass);    
-        if (I->BH_Mass + BHP(other).Mass < blackhole_params.SeedBHDynMass) {
-            O->Mass += 0; 
-        }
-        else {
-            O->Mass += I->BH_Mass + BHP(other).Mass - I->Mass; 
-        }    
+        if (I->BH_Mass + BHP(other).Mass > I->Mass) {
+            O->Mass += I->BH_Mass + BHP(other).Mass - I->Mass;
+        } 
 
 
         /* Conserve momentum during accretion*/
