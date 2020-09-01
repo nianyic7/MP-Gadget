@@ -683,28 +683,29 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
     /*            x = v/sqrt(2)/sigma                                                  */
     /*        sigma = width of the max. distr. of the host system                      */
     /*                (e.g. sigma = v_disp / 3                                         */
-
+    
     if(BH_GET_PRIV(tw)->BH_SurroundingDensity[PI] > 0){ 
         double bhvel;
         double lambda, x, f_of_x;
         const double a_erf = 8 * (M_PI - 3) / (3 * M_PI * (4. - M_PI));
 
+
         /* normalize velocity/dispersion */
         BH_GET_PRIV(tw)->BH_SurroundingRmsVel[PI] /= BH_GET_PRIV(tw)->BH_SurroundingDensity[PI];
         BH_GET_PRIV(tw)->BH_SurroundingRmsVel[PI] = sqrt(BH_GET_PRIV(tw)->BH_SurroundingRmsVel[PI]);
-        for(j = 0; j < 3; j++)
-            BH_GET_PRIV(tw)->BH_SurroundingVel[PI][j] /= BH_GET_PRIV(tw)->BH_SurroundingDensity[PI];
+        for(int k = 0; k < 3; k++)
+            BH_GET_PRIV(tw)->BH_SurroundingVel[PI][k] /= BH_GET_PRIV(tw)->BH_SurroundingDensity[PI];
+
 
         /* Calculate Coulumb Logarithm */
         bhvel = 0;
-        for(j = 0; j < 3; j++) 
+        for(int j = 0; j < 3; j++) 
         {
             bhvel += pow(P[n].Vel[j] - BH_GET_PRIV(tw)->BH_SurroundingVel[PI][j], 2);
         }
         bhvel = sqrt(bhvel);
 
-        /* There is no parameter in physical unit, so I kept everything in code unit */
-
+        /* This is dimensionless, so keep everything in code unit */
         x = bhvel / sqrt(2) / (BH_GET_PRIV(tw)->BH_SurroundingRmsVel[PI] / 3);
         /* First term is aproximation of the error function */
         f_of_x = x / fabs(x) * sqrt(1 - exp(-x * x * (4 / M_PI + a_erf * x * x) 
@@ -713,22 +714,23 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
         if (f_of_x < 0)
             f_of_x = 0;
 
-        lambda = 1. + blackhole_params.BH_DFbmax * pow((bhvel/All.cf.a),2) / All.G / P[n].Mass;
+        /* Now we go to physical unit */
+        bhvel /= All.cf.a;
+        double surr_rho_prop = BH_GET_PRIV(tw)->BH_SurroundingDensity[PI] * All.cf.a3inv;
+        lambda = 1. + blackhole_params.BH_DFbmax * pow(bhvel,2) / All.G / P[n].Mass;
 
-        for(j = 0; j < 3; j++) 
-        {
-            BHP(n).DFAccel[j] = - 4. * M_PI * All.G * All.G * P[n].Mass * BH_GET_PRIV(tw)->BH_SurroundingDensity[PI] * 
-            log(lambda) * f_of_x * (P[n].Vel[j] - BH_GET_PRIV(tw)->BH_SurroundingVel[PI][j]) / pow(bhvel, 3);
-            BHP(n).DFAccel[j] *= All.cf.a;  // convert to code unit of acceleration
-            BHP(n).DFAccel[j] *= blackhole_params.BH_DFBoostFactor; // Add a boost factor
+        for(int j = 0; j < 3; j++) 
+
+        {  /* Now back to code unit */
+            BHP(n).DFAccel[j] = - All.cf.a * All.cf.a * 4. * M_PI * All.G * All.G * P[n].Mass * surr_rho_prop * 
+            log(lambda) * f_of_x * (P[n].Vel[j] - BH_GET_PRIV(tw)->BH_SurroundingVel[PI][j]) / All.cf.a / pow(bhvel, 3);
+            BHP(n).DFAccel[j]  *=  blackhole_params.BH_DFBoostFactor; // Add a boost factor
         }
-        message(0,"x=%e, log(lambda)=%e, fof_x=%e, Mbh=%e, ratio=%e \n",
-           x,log(lambda),f_of_x,P[n].Mass,BHP(n).DFAccel[0]/P[n].GravAccel[0]);
     }
     else
-    {
+    {   
         message(0, "Density is zero in DF kernel, kernel may be too small.\n");
-        for(j = 0; j < 3; j++) 
+        for(int j = 0; j < 3; j++) 
         {
             BHP(n).DFAccel[j] = 0;
         }
