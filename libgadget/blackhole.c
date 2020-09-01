@@ -900,7 +900,9 @@ blackhole_feedback_postprocess(int n, TreeWalk * tw)
                     (P[n].Mass + accmass);
         P[n].Mass += accmass;
     }
-    BHP(n).Mass += BH_GET_PRIV(tw)->BH_accreted_BHMass[PI];
+    if(BH_GET_PRIV(tw)->BH_accreted_BHMass[PI] > 0){
+       BHP(n).Mass += BH_GET_PRIV(tw)->BH_accreted_BHMass[PI]; 
+    }  
 }
 
 static void
