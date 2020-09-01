@@ -899,8 +899,8 @@ blackhole_feedback_postprocess(int n, TreeWalk * tw)
             P[n].Vel[k] = (P[n].Vel[k] * P[n].Mass + BH_GET_PRIV(tw)->BH_accreted_momentum[PI][k]) /
                     (P[n].Mass + accmass);
         P[n].Mass += accmass;
-        BHP(n).Mass += BH_GET_PRIV(tw)->BH_accreted_BHMass[PI];
     }
+    BHP(n).Mass += BH_GET_PRIV(tw)->BH_accreted_BHMass[PI];
 }
 
 static void
