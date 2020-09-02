@@ -1021,8 +1021,10 @@ blackhole_feedback_postprocess(int n, TreeWalk * tw)
             P[n].Vel[k] = (P[n].Vel[k] * P[n].Mass + BH_GET_PRIV(tw)->BH_accreted_momentum[PI][k]) /
                     (P[n].Mass + accmass);
         P[n].Mass += accmass;
-        BHP(n).Mass += BH_GET_PRIV(tw)->BH_accreted_BHMass[PI];
     }
+    if(BH_GET_PRIV(tw)->BH_accreted_BHMass[PI] > 0){
+       BHP(n).Mass += BH_GET_PRIV(tw)->BH_accreted_BHMass[PI]; 
+    }    
 
     
     /*******************************************************************/
@@ -1182,7 +1184,7 @@ blackhole_accretion_ngbiter(TreeWalkQueryBHAccretion * I,
                 /* we include long range PM force, short range force and DF */
                 da[d] = (I->Accel[d] - P[other].GravAccel[d] - P[other].GravPM[d] - BHP(other).DFAccel[d]);
             }
-                        flag = check_grav_bound(dx,dv,da);
+            flag = check_grav_bound(dx,dv,da);
         }
         /* do the merge */
         if(flag == 1)
@@ -1630,6 +1632,8 @@ void blackhole_make_one(int index) {
     for(j = 0; j < 3; j++) {
         BHP(child).MinPotPos[j] = P[child].Pos[j];
         BHP(child).HaloMinPotPos[j] = P[child].Pos[j];
+        BHP(child).DFAccel[j] = 0;
+        BHP(child).DragAccel[j] = 0;
     }
     BHP(child).JumpToMinPot = 0;
     
