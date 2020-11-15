@@ -957,7 +957,7 @@ blackhole_dynfric_ngbiter(TreeWalkQueryBHDynfric * I,
         double hsearch = DMAX(I->Hsml, I->DFRadius);
         iter->base.Hsml = hsearch;
         iter->base.symmetric = NGB_TREEFIND_ASYMMETRIC;
-        density_kernel_init(&iter->df_kernel, hsearch, GetDensityKernelType());
+        density_kernel_init(&iter->df_kernel, I->DFRadius, GetDensityKernelType());
         return;
     }
 
