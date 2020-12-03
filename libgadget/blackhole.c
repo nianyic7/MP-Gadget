@@ -827,7 +827,6 @@ blackhole_accretion_postprocess(int i, TreeWalk * tw)
     double rho_proper = rho * All.cf.a3inv;
 
     double soundspeed = blackhole_soundspeed(BH_GET_PRIV(tw)->BH_Entropy[PI], rho);
-    printf("soundspeed=%f, entropy=%f, rho=%f \n", soundspeed,BH_GET_PRIV(tw)->BH_Entropy[PI],rho);
 
     /* Note: we take here a radiative efficiency of 0.1 for Eddington accretion */
     double meddington = (4 * M_PI * GRAVITY * LIGHTCGS * PROTONMASS / (0.1 * LIGHTCGS * LIGHTCGS * THOMPSON)) * BHP(i).Mass
@@ -863,7 +862,7 @@ blackhole_accretion_postprocess(int i, TreeWalk * tw)
             BHP(i).DragAccel[k] = -(P[i].Vel[k] - BH_GET_PRIV(tw)->BH_SurroundingGasVel[PI][k])*fac;
         }
     }
-    else if (blackhole_params.BH_DRAG ==3){
+    else if (blackhole_params.BH_DRAG ==3) && (BHP(i).Density > 0){
         /* F_df = 4 * pi * rho_gas * (G * M_bh)^2 / (v_BH - v_gas)^2 * I(M)   */
         /* I(M),sub = 0.5 * ln((1 + M) / (1 - M)) - M                         */
         /* I(M),sup = 0.5 * ln(M^2 - 1) + log(lambda)                         */
@@ -875,7 +874,7 @@ blackhole_accretion_postprocess(int i, TreeWalk * tw)
         double fac = 0;
         double mach = bhvel / soundspeed;
         double lambda = 1. + blackhole_params.BH_DFbmax * pow(bhvel,2) / All.G / P[i].Mass;
-        printf("soundspeed=%f, mach = %f, lam = %f \n", soundspeed,mach , lambda );
+        // printf("soundspeed=%f, mach = %f, lam = %f \n", soundspeed,mach , lambda );
         if (mach < 1.){   //subsonic
             fac = 0.5 * log( (1 + mach) / (1 - mach) ) - mach;
         }
