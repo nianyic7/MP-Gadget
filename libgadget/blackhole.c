@@ -850,15 +850,40 @@ blackhole_accretion_postprocess(int i, TreeWalk * tw)
 
     /*************************************************************************/
     
-    if(blackhole_params.BH_DRAG > 0){
+    if((blackhole_params.BH_DRAG ==1) || (blackhole_params.BH_DRAG ==2)){
         /* a_BH = (v_gas - v_BH) Mdot/M_BH                                   */
         /* motivated by BH gaining momentum from the accreted gas            */
         /*c.f.section 3.2,in http://www.tapir.caltech.edu/~phopkins/public/notes_blackholes.pdf */
         double fac = 0;
         if (blackhole_params.BH_DRAG == 1) fac = BHP(i).Mdot/P[i].Mass; 
         if (blackhole_params.BH_DRAG == 2) fac = blackhole_params.BlackHoleEddingtonFactor * meddington/BHP(i).Mass;
+        fac *= All.cf.a; /* dv = acc * kick_fac = acc * a^{-1}dt, therefore acc = a*dv/dt  */
         for(k = 0; k < 3; k++) {
-            fac *= All.cf.a; /* dv = acc * kick_fac = acc * a^{-1}dt, therefore acc = a*dv/dt  */
+            BHP(i).DragAccel[k] = -(P[i].Vel[k] - BH_GET_PRIV(tw)->BH_SurroundingGasVel[PI][k])*fac;
+        }
+    }
+    else if (blackhole_params.BH_DRAG ==3){
+        /* F_df = 4 * pi * rho_gas * (G * M_bh)^2 / (v_BH - v_gas)^2 * I(M)   */
+        /* I(M),sub = 0.5 * ln((1 + M) / (1 - M)) - M                         */
+        /* I(M),sup = 0.5 * ln(M^2 - 1) + log(lambda)                         */
+        /* M = (v_bh - v_gas) / cs                                            */
+        /* Hydro conterpart of dynsmical friction                             */
+        /* c.f.section 2.3,in Ostriker 1999                                   */
+
+        // use the physical bhvel,rho_proper already calculated in accretion
+        double fac = 0;
+        double mach = bhvel / soundspeed;
+        double lambda = 1. + blackhole_params.BH_DFbmax * pow(bhvel,2) / All.G / P[n].Mass;
+
+        if (mach <= 1.){   //subsonic
+            fac = 0.5 * log( (1 + mach) / (1 - mach) ) - mach;
+        }
+        else {            //supersonic
+            fac = 0.5 * log(pow(mach,2) - 1) + log(lambda);
+        }
+        fac *= 4. * M_PI * rho_proper * pow(All.G * P[n].Mass / bhvel, 2) / bhvel;
+        fac *= All.cf.a; /* dv = acc * kick_fac = acc * a^{-1}dt, therefore acc = a*dv/dt  */
+        for(k = 0; k < 3; k++) {
             BHP(i).DragAccel[k] = -(P[i].Vel[k] - BH_GET_PRIV(tw)->BH_SurroundingGasVel[PI][k])*fac;
         }
     }
