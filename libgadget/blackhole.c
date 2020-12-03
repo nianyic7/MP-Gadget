@@ -873,7 +873,7 @@ blackhole_accretion_postprocess(int i, TreeWalk * tw)
         // use the physical bhvel,rho_proper already calculated in accretion
         double fac = 0;
         double mach = bhvel / soundspeed;
-        double lambda = 1. + blackhole_params.BH_DFbmax * pow(bhvel,2) / All.G / P[n].Mass;
+        double lambda = 1. + blackhole_params.BH_DFbmax * pow(bhvel,2) / All.G / P[i].Mass;
 
         if (mach <= 1.){   //subsonic
             fac = 0.5 * log( (1 + mach) / (1 - mach) ) - mach;
