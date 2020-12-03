@@ -827,6 +827,7 @@ blackhole_accretion_postprocess(int i, TreeWalk * tw)
     double rho_proper = rho * All.cf.a3inv;
 
     double soundspeed = blackhole_soundspeed(BH_GET_PRIV(tw)->BH_Entropy[PI], rho);
+    printf("soundspeed=%f \n", soundspeed);
 
     /* Note: we take here a radiative efficiency of 0.1 for Eddington accretion */
     double meddington = (4 * M_PI * GRAVITY * LIGHTCGS * PROTONMASS / (0.1 * LIGHTCGS * LIGHTCGS * THOMPSON)) * BHP(i).Mass
