@@ -874,8 +874,8 @@ blackhole_accretion_postprocess(int i, TreeWalk * tw)
         double fac = 0;
         double mach = bhvel / soundspeed;
         double lambda = 1. + blackhole_params.BH_DFbmax * pow(bhvel,2) / All.G / P[i].Mass;
-
-        if (mach <= 1.){   //subsonic
+        printf("mach = %f, lam = %f \n", mach , lambda );
+        if (mach < 1.){   //subsonic
             fac = 0.5 * log( (1 + mach) / (1 - mach) ) - mach;
         }
         else {            //supersonic
@@ -883,6 +883,7 @@ blackhole_accretion_postprocess(int i, TreeWalk * tw)
         }
         fac *= 4. * M_PI * rho_proper * pow(All.G * P[i].Mass / bhvel, 2) / bhvel;
         fac *= All.cf.a; /* dv = acc * kick_fac = acc * a^{-1}dt, therefore acc = a*dv/dt  */
+        printf("fac = %f \n", fac);
         for(k = 0; k < 3; k++) {
             BHP(i).DragAccel[k] = -(P[i].Vel[k] - BH_GET_PRIV(tw)->BH_SurroundingGasVel[PI][k])*fac;
         }
