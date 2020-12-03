@@ -881,7 +881,7 @@ blackhole_accretion_postprocess(int i, TreeWalk * tw)
         else {            //supersonic
             fac = 0.5 * log(pow(mach,2) - 1) + log(lambda);
         }
-        fac *= 4. * M_PI * rho_proper * pow(All.G * P[n].Mass / bhvel, 2) / bhvel;
+        fac *= 4. * M_PI * rho_proper * pow(All.G * P[i].Mass / bhvel, 2) / bhvel;
         fac *= All.cf.a; /* dv = acc * kick_fac = acc * a^{-1}dt, therefore acc = a*dv/dt  */
         for(k = 0; k < 3; k++) {
             BHP(i).DragAccel[k] = -(P[i].Vel[k] - BH_GET_PRIV(tw)->BH_SurroundingGasVel[PI][k])*fac;
