@@ -874,7 +874,7 @@ blackhole_accretion_postprocess(int i, TreeWalk * tw)
         double fac = 0;
         double mach = bhvel / soundspeed;
         double lambda = 1. + blackhole_params.BH_DFbmax * pow(bhvel,2) / All.G / P[i].Mass;
-        printf("mach = %f, lam = %f \n", mach , lambda );
+        printf("soundspeed=%f, mach = %f, lam = %f \n", soundspeed,mach , lambda );
         if (mach < 1.){   //subsonic
             fac = 0.5 * log( (1 + mach) / (1 - mach) ) - mach;
         }
