@@ -862,7 +862,7 @@ blackhole_accretion_postprocess(int i, TreeWalk * tw)
             BHP(i).DragAccel[k] = -(P[i].Vel[k] - BH_GET_PRIV(tw)->BH_SurroundingGasVel[PI][k])*fac;
         }
     }
-    else if (blackhole_params.BH_DRAG ==3) && (BHP(i).Density > 0){
+    else if ((blackhole_params.BH_DRAG ==3) && (BHP(i).Density > 0)){
         /* F_df = 4 * pi * rho_gas * (G * M_bh)^2 / (v_BH - v_gas)^2 * I(M)   */
         /* I(M),sub = 0.5 * ln((1 + M) / (1 - M)) - M                         */
         /* I(M),sup = 0.5 * ln(M^2 - 1) + log(lambda)                         */
