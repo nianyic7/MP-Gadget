@@ -722,8 +722,8 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
 
         for(j = 0; j < 3; j++) 
         {  /* Now back to code unit */
-            BHP(n).DFAccel[j] = - All.cf.a * All.cf.a * 4. * M_PI * All.G * All.G * P[n].Mass * surr_rho_prop * 
-            log(lambda) * f_of_x * (P[n].Vel[j] - BH_GET_PRIV(tw)->BH_SurroundingVel[PI][j]) / All.cf.a / pow(bhvel, 3);
+            BHP(n).DFAccel[j] = - All.cf.a * All.cf.a * (4. * M_PI * All.G * All.G * P[n].Mass * surr_rho_prop * 
+            log(lambda) * f_of_x * (P[n].Vel[j] - BH_GET_PRIV(tw)->BH_SurroundingVel[PI][j]) / All.cf.a / pow(bhvel, 3));
             BHP(n).DFAccel[j]  *=  blackhole_params.BH_DFBoostFactor; // Add a boost factor
         }
     }
@@ -867,25 +867,31 @@ blackhole_accretion_postprocess(int i, TreeWalk * tw)
         /* I(M),sub = 0.5 * ln((1 + M) / (1 - M)) - M                         */
         /* I(M),sup = 0.5 * ln(M^2 - 1) + log(lambda)                         */
         /* M = (v_bh - v_gas) / cs                                            */
-        /* Hydro conterpart of dynsmical friction                             */
+        /* Hydro counterpart of dynamical friction                             */
         /* c.f.section 2.3,in Ostriker 1999                                   */
 
         // use the physical bhvel,rho_proper already calculated in accretion
         double fac = 0;
+        double Ffid = 0;
         double mach = bhvel / soundspeed;
         double lambda = 1. + blackhole_params.BH_DFbmax * pow(bhvel,2) / All.G / P[i].Mass;
-        // printf("soundspeed=%f, mach = %f, lam = %f \n", soundspeed,mach , lambda );
+        // this is dimensionless
         if (mach < 1.){   //subsonic
-            fac = 0.5 * log( (1 + mach) / (1 - mach) ) - mach;
+            fac = pow(mach,-2) * (0.5 * log( (1 + mach) / (1 - mach) ) - mach);
         }
         else {            //supersonic
-            fac = 0.5 * log(pow(mach,2) - 1) + log(lambda);
+            fac = pow(mach,-2) * (0.5 * log(pow(mach,2) - 1) + log(lambda));
         }
-        fac *= 4. * M_PI * rho_proper * pow(All.G * P[i].Mass / bhvel, 2) / bhvel;
-        fac *= All.cf.a; /* dv = acc * kick_fac = acc * a^{-1}dt, therefore acc = a*dv/dt  */
-        printf("fac = %f \n", fac);
+        Ffid = 4. * M_PI * rho_proper * pow(All.G * P[i].Mass / soundspeed, 2); // this is proper force
+        // acc_prop = acc_comov/a^2; vel_prop = vel_comov/a;
+
         for(k = 0; k < 3; k++) {
-            BHP(i).DragAccel[k] = -(P[i].Vel[k] - BH_GET_PRIV(tw)->BH_SurroundingGasVel[PI][k])*fac;
+            // this is still proper
+            BHP(i).DragAccel[k] = -(P[i].Vel[k] - BH_GET_PRIV(tw)->BH_SurroundingGasVel[PI][k])/All.cf.a/bhvel;
+            // now from force to acc
+            BHP(i).DragAccel[k] *= fac*Ffid/P[i].Mass;
+            // Finally back to code unit
+            BHP(i).DragAccel[k] *= All.cf.a * All.cf.a;
         }
     }
     else{ 
