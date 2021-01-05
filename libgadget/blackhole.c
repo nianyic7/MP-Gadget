@@ -718,7 +718,7 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
         /* Now we go to physical unit */
         bhvel /= All.cf.a;
         double surr_rho_prop = BH_GET_PRIV(tw)->BH_SurroundingDensity[PI] * All.cf.a3inv;
-        lambda = 1. + blackhole_params.BH_DFbmax * pow(bhvel,2) / All.G / P[n].Mass;
+        lambda = 1. + blackhole_params.BH_DFbmax * All.cf.a * pow(bhvel,2) / All.G / P[n].Mass;
 
         for(j = 0; j < 3; j++) 
         {  /* Now back to code unit */
