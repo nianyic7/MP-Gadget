@@ -480,7 +480,7 @@ collect_BH_info(int * ActiveBlackHoles, int NumActiveBlackHoles, struct BHPriv *
             info->Velocity[k] = P[p_i].Vel[k];
             info->BH_DFAccel[k] = BHP(p_i).DFAccel[k];
             // old 
-            info->BH_DFAccelOld[k] = priv->BH_DFAccelOld[k];
+            info->BH_DFAccelOld[k] = priv->BH_DFAccelOld[PI][k];
             // old
         }
 
@@ -844,8 +844,8 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
     /* alpha_i   = b_i * v_i^2 /G/M                                                           */
     for(j = 0; j < 3; j++){
         /* prevent DFAccel from exploding */
-        if(BH_GET_PRIV(tw)->BH_DFAccel[j] > 0){
-            BHP(n).DFAccel[j] = BH_GET_PRIV(tw)->BH_DFAccel[j];
+        if(BH_GET_PRIV(tw)->BH_DFAccel[PI][j] > 0){
+            BHP(n).DFAccel[j] = BH_GET_PRIV(tw)->BH_DFAccel[PI][j];
             BHP(n).DFAccel[j] *= BH_GET_PRIV(tw)->atime;  // convert to code unit of acceleration
             BHP(n).DFAccel[j] *= blackhole_params.BH_DFBoostFactor; // Add a boost factor
         }
@@ -892,18 +892,18 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
         {
             /* prevent DFAccel from exploding */
             if(bhvel > 0){
-                BH_GET_PRIV(tw)->BH_DFAccelOld[j] = - 4. * M_PI * BH_GET_PRIV(tw)->CP->GravInternal * BH_GET_PRIV(tw)->CP->GravInternal * P[n].Mass * BH_GET_PRIV(tw)->BH_SurroundingDensity[PI] *
+                BH_GET_PRIV(tw)->BH_DFAccelOld[PI][j] = - 4. * M_PI * BH_GET_PRIV(tw)->CP->GravInternal * BH_GET_PRIV(tw)->CP->GravInternal * P[n].Mass * BH_GET_PRIV(tw)->BH_SurroundingDensity[PI] *
                 log(lambda) * f_of_x * (P[n].Vel[j] - BH_GET_PRIV(tw)->BH_SurroundingVel[PI][j]) / pow(bhvel, 3);
-                BH_GET_PRIV(tw)->BH_DFAccelOld[j] *= BH_GET_PRIV(tw)->atime;  // convert to code unit of acceleration
-                BH_GET_PRIV(tw)->BH_DFAccelOld[j] *= blackhole_params.BH_DFBoostFactor; // Add a boost factor
+                BH_GET_PRIV(tw)->BH_DFAccelOld[PI][j] *= BH_GET_PRIV(tw)->atime;  // convert to code unit of acceleration
+                BH_GET_PRIV(tw)->BH_DFAccelOld[PI][j] *= blackhole_params.BH_DFBoostFactor; // Add a boost factor
             }
             else{
-                BH_GET_PRIV(tw)->BH_DFAccelOld[j] = 0;
+                BH_GET_PRIV(tw)->BH_DFAccelOld[PI][j] = 0;
             }
         }
 #ifdef DEBUG
         message(2,"x=%e, log(lambda)=%e, fof_x=%e, Mbh=%e, ratio=%e \n",
-           x,log(lambda),f_of_x,P[n].Mass,BH_GET_PRIV(tw)->BH_DFAccelOld[0]/P[n].FullTreeGravAccel[0]);
+           x,log(lambda),f_of_x,P[n].Mass,BH_GET_PRIV(tw)->BH_DFAccelOld[PI][0]/P[n].FullTreeGravAccel[0]);
 #endif
     }
     else
@@ -912,7 +912,7 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
             P[n].ID, BH_GET_PRIV(tw)->BH_SurroundingParticles[PI], BHP(n).Mass, P[n].Hsml, BHP(n).Density, P[n].Pos[0], P[n].Pos[1], P[n].Pos[2]);
         for(j = 0; j < 3; j++)
         {
-            BH_GET_PRIV(tw)->BH_DFAccelOld[j] = 0;
+            BH_GET_PRIV(tw)->BH_DFAccelOld[PI][j] = 0;
         }
     }
     
