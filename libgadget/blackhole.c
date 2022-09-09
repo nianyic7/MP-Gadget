@@ -103,17 +103,12 @@ typedef struct {
 typedef struct {
     TreeWalkQueryBase base;
     MyFloat Hsml;
-    MyFloat BHVel[3];
-    MyFloat BHPos[3];
+    MyFloat Vel[3];
 } TreeWalkQueryBHDynfric;
 
 typedef struct {
     TreeWalkResultBase base;
-    MyFloat SurroundingVel[3];
-    MyFloat SurroundingDensity;
-    int SurroundingParticles;
-    MyFloat SurroundingRmsVel;
-
+    MyFloat a_df[3];
 } TreeWalkResultBHDynfric;
 
 typedef struct {
@@ -163,10 +158,7 @@ struct BHPriv {
 
     /*************************************************************************/
     /* used in the dynamic friction treewalk*/
-    MyFloat * BH_SurroundingDensity;
-    int * BH_SurroundingParticles;
-    MyFloat (*BH_SurroundingVel)[3];
-    MyFloat * BH_SurroundingRmsVel;
+    MyFloat (*BH_DFAccel)[3];
 
     /*************************************************************************/
 
@@ -888,11 +880,9 @@ static void
 blackhole_dynfric_reduce(int place, TreeWalkResultBHDynfric * remote, enum TreeWalkReduceMode mode, TreeWalk * tw){
     int PI = P[place].PI;
     
-    TREEWALK_REDUCE(BH_GET_PRIV(tw)->BH_SurroundingVel[PI][0], remote->SurroundingVel[0]);
-    TREEWALK_REDUCE(BH_GET_PRIV(tw)->BH_SurroundingVel[PI][1], remote->SurroundingVel[1]);
-    TREEWALK_REDUCE(BH_GET_PRIV(tw)->BH_SurroundingVel[PI][2], remote->SurroundingVel[2]);
-    
-    
+    TREEWALK_REDUCE(BH_GET_PRIV(tw)->BH_DFAccel[PI][0], remote->DFAccel[0]);
+    TREEWALK_REDUCE(BH_GET_PRIV(tw)->BH_DFAccel[PI][1], remote->DFAccel[1]);
+    TREEWALK_REDUCE(BH_GET_PRIV(tw)->BH_DFAccel[PI][2], remote->DFAccel[2]);
 
 }
 
@@ -901,9 +891,9 @@ blackhole_dynfric_copy(int place, TreeWalkQueryBHDynfric * I, TreeWalk * tw){
     /* SPH kernel width should be the only thing needed */
     int k;
     I->Hsml = P[place].Hsml;
+    I->Mass = P[place].Mass;
     for (k = 0; k < 3; k++){
-        I->BHPos[k] = P[place].Pos[k];
-        I->BHVel[k] = P[place].Vel[k];
+        I->Vel[k] = P[place].Vel[k];
     }
 }
 
@@ -961,9 +951,8 @@ blackhole_dynfric_ngbiter(TreeWalkQueryBHDynfric * I,
             for(d = 0; d < 3; d++){
                 b_j += (dx[d] - r_proj * dv[d] / dv_mag / dv_mag) * (dx[d] - r_proj * dv[d] / dv_mag / dv_mag);
             }
-            double alpha_j = b_j * dv_mag * dv_mag / BH_GET_PRIV(tw)->CP->GravInternal * I->Mass;
+            double alpha_j = b_j * dv_mag * dv_mag / BH_GET_PRIV(lv->tw)->CP->GravInternal * I->Mass;
             
-            double a_df[3];
             double soft_fac;
             double u = r/FORCE_SOFTENING(0,1);
 
@@ -979,10 +968,10 @@ blackhole_dynfric_ngbiter(TreeWalkQueryBHDynfric * I,
 
             double df_mag = alpha_j * b_j / (1 + alpha_j * alpha_j) / r;
             df_mag *= soft_fac;
-            df_mag *= BH_GET_PRIV(tw)->CP->GravInternal * mass_j / r2;
+            df_mag *= BH_GET_PRIV(lv->tw)->CP->GravInternal * mass_j / r2;
                 
             for(d = 0; d < 3; d++){
-                a_df[d] = df_mag * dv[d] / dv_mag;
+                O->DFAccel[d] = df_mag * dv[d] / dv_mag;
             }
         }
     }
