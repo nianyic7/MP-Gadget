@@ -103,12 +103,21 @@ typedef struct {
 typedef struct {
     TreeWalkQueryBase base;
     MyFloat Hsml;
+    MyFloat Mass;
     MyFloat Vel[3];
 } TreeWalkQueryBHDynfric;
 
 typedef struct {
     TreeWalkResultBase base;
-    MyFloat a_df[3];
+    MyFloat DFAccel[3];
+    
+    // old
+    MyFloat SurroundingVel[3];
+    MyFloat SurroundingDensity;
+    int SurroundingParticles;
+    MyFloat SurroundingRmsVel;
+    // old
+    
 } TreeWalkResultBHDynfric;
 
 typedef struct {
@@ -117,7 +126,6 @@ typedef struct {
 } TreeWalkNgbIterBHDynfric;
 
 /*****************************************************************************/
-
 
 typedef struct {
     TreeWalkQueryBase base;
@@ -159,6 +167,14 @@ struct BHPriv {
     /*************************************************************************/
     /* used in the dynamic friction treewalk*/
     MyFloat (*BH_DFAccel)[3];
+    
+    //old
+    MyFloat (*BH_DFAccelOld)[3];
+    MyFloat * BH_SurroundingDensity;
+    int * BH_SurroundingParticles;
+    MyFloat (*BH_SurroundingVel)[3];
+    MyFloat * BH_SurroundingRmsVel;
+    //old
 
     /*************************************************************************/
 
@@ -225,10 +241,14 @@ struct __attribute__((__packed__)) BHinfo{
 
     /****************************************/
     double Pos[3];
+    
+    // old
+    double BH_DFAccelOld[3];
     MyFloat BH_SurroundingDensity;
     MyFloat BH_SurroundingParticles;
     MyFloat BH_SurroundingVel[3];
     MyFloat BH_SurroundingRmsVel;
+    //old
 
     double BH_DFAccel[3];
     double BH_DragAccel[3];
@@ -459,17 +479,21 @@ collect_BH_info(int * ActiveBlackHoles, int NumActiveBlackHoles, struct BHPriv *
             info->Pos[k] = P[p_i].Pos[k] - PartManager->CurrentParticleOffset[k];
             info->Velocity[k] = P[p_i].Vel[k];
             info->BH_DFAccel[k] = BHP(p_i).DFAccel[k];
+            // old 
+            info->BH_DFAccelOld[k] = priv->BH_DFAccelOld[k];
+            // old
         }
 
         /****************************************************************************/
         /* Output some DF info for debugging */
+        // old 
         info->BH_SurroundingDensity = priv->BH_SurroundingDensity[PI];
         info->BH_SurroundingRmsVel = priv->BH_SurroundingRmsVel[PI];
         info->BH_SurroundingParticles = priv->BH_SurroundingParticles[PI];
         info->BH_SurroundingVel[0] = priv->BH_SurroundingVel[PI][0];
         info->BH_SurroundingVel[1] = priv->BH_SurroundingVel[PI][1];
         info->BH_SurroundingVel[2] = priv->BH_SurroundingVel[PI][2];
-
+        // old
         /****************************************************************************/
         info->BH_accreted_BHMass = priv->BH_accreted_BHMass[PI];
         info->BH_accreted_Mass = priv->BH_accreted_Mass[PI];
@@ -639,10 +663,17 @@ blackhole(const ActiveParticles * act, double atime, Cosmology * CP, ForceTree *
     /*  Dynamical Friction Treewalk */
 
     /* Environment variables for DF */
+
+    priv->BH_DFAccel = (MyFloat (*) [3]) mymalloc("BH_DFAccel", 3* SlotsManager->info[5].size * sizeof(priv->BH_DFAccel[0]));
+    
+    // old
     priv->BH_SurroundingRmsVel = (MyFloat *) mymalloc("BH_SurroundingRmsVel", SlotsManager->info[5].size * sizeof(priv->BH_SurroundingRmsVel));
     priv->BH_SurroundingVel = (MyFloat (*) [3]) mymalloc("BH_SurroundingVel", 3* SlotsManager->info[5].size * sizeof(priv->BH_SurroundingVel[0]));
     priv->BH_SurroundingParticles = (int *)mymalloc("BH_SurroundingParticles", SlotsManager->info[5].size * sizeof(priv->BH_SurroundingParticles));
     priv->BH_SurroundingDensity = (MyFloat *) mymalloc("BH_SurroundingDensity", SlotsManager->info[5].size * sizeof(priv->BH_SurroundingDensity));
+    priv->BH_DFAccelOld = (MyFloat (*) [3]) mymalloc("BH_DFAccelOld", 3* SlotsManager->info[5].size * sizeof(priv->BH_DFAccelOld[0]));
+    // old
+    
     /* guard treewalk */
     if (blackhole_params.BH_DynFrictionMethod > 0)
         treewalk_run(tw_dynfric, ActiveBlackHoles, NumActiveBlackHoles);
@@ -725,11 +756,15 @@ blackhole(const ActiveParticles * act, double atime, Cosmology * CP, ForceTree *
     myfree(priv->SPH_SwallowID);
 
     /*****************************************************************/
+    myfree(priv->BH_DFAccel);
+    
+    //old
     myfree(priv->BH_SurroundingDensity);
     myfree(priv->BH_SurroundingParticles);
     myfree(priv->BH_SurroundingVel);
     myfree(priv->BH_SurroundingRmsVel);
-
+    myfree(priv->BH_DFAccelOld);
+    //old
     /*****************************************************************/
     myfree(ActiveBlackHoles);
 
@@ -807,8 +842,21 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
     /* a_df_i[j] = (alpha_i*b_i)/(1 + alpha_i^2)/r_i * (soft_i(r_i)*G*m_i/r_i^2) * V_i[j]/V_i */
     /* b_i[j]    = r_i[j] - (r_i \dot v_i/|v_i|)  v_i[j]/|v_i|                                */
     /* alpha_i   = b_i * v_i^2 /G/M                                                           */
+    for(j = 0; j < 3; j++){
+        /* prevent DFAccel from exploding */
+        if(BH_GET_PRIV(tw)->BH_DFAccel[j] > 0){
+            BHP(n).DFAccel[j] = BH_GET_PRIV(tw)->BH_DFAccel[j];
+            BHP(n).DFAccel[j] *= BH_GET_PRIV(tw)->atime;  // convert to code unit of acceleration
+            BHP(n).DFAccel[j] *= blackhole_params.BH_DFBoostFactor; // Add a boost factor
+        }
+        else{
+            BHP(n).DFAccel[j] = 0;
+        }
+    }
     
-
+    
+    
+    /******************* old ***************************/
     if(BH_GET_PRIV(tw)->BH_SurroundingDensity[PI] > 0){
         double bhvel;
         double lambda, x, f_of_x;
@@ -844,18 +892,18 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
         {
             /* prevent DFAccel from exploding */
             if(bhvel > 0){
-                BHP(n).DFAccel[j] = - 4. * M_PI * BH_GET_PRIV(tw)->CP->GravInternal * BH_GET_PRIV(tw)->CP->GravInternal * P[n].Mass * BH_GET_PRIV(tw)->BH_SurroundingDensity[PI] *
+                BH_GET_PRIV(tw)->BH_DFAccelOld[j] = - 4. * M_PI * BH_GET_PRIV(tw)->CP->GravInternal * BH_GET_PRIV(tw)->CP->GravInternal * P[n].Mass * BH_GET_PRIV(tw)->BH_SurroundingDensity[PI] *
                 log(lambda) * f_of_x * (P[n].Vel[j] - BH_GET_PRIV(tw)->BH_SurroundingVel[PI][j]) / pow(bhvel, 3);
-                BHP(n).DFAccel[j] *= BH_GET_PRIV(tw)->atime;  // convert to code unit of acceleration
-                BHP(n).DFAccel[j] *= blackhole_params.BH_DFBoostFactor; // Add a boost factor
+                BH_GET_PRIV(tw)->BH_DFAccelOld[j] *= BH_GET_PRIV(tw)->atime;  // convert to code unit of acceleration
+                BH_GET_PRIV(tw)->BH_DFAccelOld[j] *= blackhole_params.BH_DFBoostFactor; // Add a boost factor
             }
             else{
-                BHP(n).DFAccel[j] = 0;
+                BH_GET_PRIV(tw)->BH_DFAccelOld[j] = 0;
             }
         }
 #ifdef DEBUG
         message(2,"x=%e, log(lambda)=%e, fof_x=%e, Mbh=%e, ratio=%e \n",
-           x,log(lambda),f_of_x,P[n].Mass,BHP(n).DFAccel[0]/P[n].FullTreeGravAccel[0]);
+           x,log(lambda),f_of_x,P[n].Mass,BH_GET_PRIV(tw)->BH_DFAccelOld[0]/P[n].FullTreeGravAccel[0]);
 #endif
     }
     else
@@ -864,9 +912,12 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
             P[n].ID, BH_GET_PRIV(tw)->BH_SurroundingParticles[PI], BHP(n).Mass, P[n].Hsml, BHP(n).Density, P[n].Pos[0], P[n].Pos[1], P[n].Pos[2]);
         for(j = 0; j < 3; j++)
         {
-            BHP(n).DFAccel[j] = 0;
+            BH_GET_PRIV(tw)->BH_DFAccelOld[j] = 0;
         }
     }
+    
+    /******************* old ***************************/
+    
 }
 
 /*******************************************************************/
@@ -883,6 +934,15 @@ blackhole_dynfric_reduce(int place, TreeWalkResultBHDynfric * remote, enum TreeW
     TREEWALK_REDUCE(BH_GET_PRIV(tw)->BH_DFAccel[PI][0], remote->DFAccel[0]);
     TREEWALK_REDUCE(BH_GET_PRIV(tw)->BH_DFAccel[PI][1], remote->DFAccel[1]);
     TREEWALK_REDUCE(BH_GET_PRIV(tw)->BH_DFAccel[PI][2], remote->DFAccel[2]);
+    
+    //old
+    TREEWALK_REDUCE(BH_GET_PRIV(tw)->BH_SurroundingDensity[PI], remote->SurroundingDensity);
+    TREEWALK_REDUCE(BH_GET_PRIV(tw)->BH_SurroundingParticles[PI], remote->SurroundingParticles);
+    TREEWALK_REDUCE(BH_GET_PRIV(tw)->BH_SurroundingVel[PI][0], remote->SurroundingVel[0]);
+    TREEWALK_REDUCE(BH_GET_PRIV(tw)->BH_SurroundingVel[PI][1], remote->SurroundingVel[1]);
+    TREEWALK_REDUCE(BH_GET_PRIV(tw)->BH_SurroundingVel[PI][2], remote->SurroundingVel[2]);
+    TREEWALK_REDUCE(BH_GET_PRIV(tw)->BH_SurroundingRmsVel[PI], remote->SurroundingRmsVel);
+    //old
 
 }
 
@@ -922,12 +982,10 @@ blackhole_dynfric_ngbiter(TreeWalkQueryBHDynfric * I,
     if(P[other].Type == 4 || (P[other].Type == 1 && blackhole_params.BH_DynFrictionMethod > 1) ||
         (P[other].Type == 0 && blackhole_params.BH_DynFrictionMethod == 3) ){
         if(r2 < iter->dynfric_kernel.HH) {
-            
-            double dx[3];
-            double dv[3];
             MyFloat VelPred[3];
             int d;
-            
+            double dx[3];
+            double dv[3];
             if(P[other].Type == 0)
                 SPH_VelPred(other, VelPred, BH_GET_PRIV(lv->tw)->FgravkickB, BH_GET_PRIV(lv->tw)->gravkicks, BH_GET_PRIV(lv->tw)->hydrokicks);
             else {
@@ -943,7 +1001,7 @@ blackhole_dynfric_ngbiter(TreeWalkQueryBHDynfric * I,
             double r_proj = 0;
             double dv_mag = 0;
             for(d = 0; d < 3; d++){
-                r_proj += dr[d] * dv[d];
+                r_proj += dx[d] * dv[d];
                 dv_mag += dv[d] * dv[d];
             }
             
@@ -973,8 +1031,25 @@ blackhole_dynfric_ngbiter(TreeWalkQueryBHDynfric * I,
             for(d = 0; d < 3; d++){
                 O->DFAccel[d] = df_mag * dv[d] / dv_mag;
             }
+            
+            // old
+            u = r * iter->dynfric_kernel.Hinv;
+            double wk = density_kernel_wk(&iter->dynfric_kernel, u);
+            int k;
+            O->SurroundingParticles += 1;
+            O->SurroundingDensity += (mass_j * wk);
+
+            for (k = 0; k < 3; k++){
+                O->SurroundingVel[k] += (mass_j * wk * VelPred[k]);
+                O->SurroundingRmsVel += (mass_j * wk * pow(VelPred[k], 2));
+            }
+            //old
+    
         }
     }
+    
+
+    
 }
 
 /*************************************************************************************/
