@@ -243,14 +243,14 @@ struct __attribute__((__packed__)) BHinfo{
     double Pos[3];
     
     // old
-    double BH_DFAccelOld[3];
+    MyFloat BH_DFAccelOld[3];
     MyFloat BH_SurroundingDensity;
     MyFloat BH_SurroundingParticles;
     MyFloat BH_SurroundingVel[3];
     MyFloat BH_SurroundingRmsVel;
     //old
 
-    double BH_DFAccel[3];
+    MyFloat BH_DFAccel[3];
     double BH_DragAccel[3];
     double BH_FullTreeGravAccel[3];
     double Velocity[3];
@@ -756,15 +756,18 @@ blackhole(const ActiveParticles * act, double atime, Cosmology * CP, ForceTree *
     myfree(priv->SPH_SwallowID);
 
     /*****************************************************************/
-    myfree(priv->BH_DFAccel);
-    
+   
+    // first in last out!
     //old
+    myfree(priv->BH_DFAccelOld);
     myfree(priv->BH_SurroundingDensity);
     myfree(priv->BH_SurroundingParticles);
     myfree(priv->BH_SurroundingVel);
     myfree(priv->BH_SurroundingRmsVel);
-    myfree(priv->BH_DFAccelOld);
     //old
+    
+    myfree(priv->BH_DFAccel);
+    
     /*****************************************************************/
     myfree(ActiveBlackHoles);
 
@@ -842,16 +845,14 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
     /* a_df_i[j] = (alpha_i*b_i)/(1 + alpha_i^2)/r_i * (soft_i(r_i)*G*m_i/r_i^2) * V_i[j]/V_i */
     /* b_i[j]    = r_i[j] - (r_i \dot v_i/|v_i|)  v_i[j]/|v_i|                                */
     /* alpha_i   = b_i * v_i^2 /G/M                                                           */
+    double df;
     for(j = 0; j < 3; j++){
-        /* prevent DFAccel from exploding */
-        if(BH_GET_PRIV(tw)->BH_DFAccel[PI][j] > 0){
-            BHP(n).DFAccel[j] = BH_GET_PRIV(tw)->BH_DFAccel[PI][j];
-            BHP(n).DFAccel[j] *= BH_GET_PRIV(tw)->atime;  // convert to code unit of acceleration
-            BHP(n).DFAccel[j] *= blackhole_params.BH_DFBoostFactor; // Add a boost factor
-        }
-        else{
-            BHP(n).DFAccel[j] = 0;
-        }
+        df = BH_GET_PRIV(tw)->BH_DFAccel[PI][j];
+        BHP(n).DFAccel[j] = df;
+        // no extra scale fac needed here for the Ma2022 implementation
+        // 1/r^2 scales with a^2, same as acc
+//        BHP(n).DFAccel[j] *= BH_GET_PRIV(tw)->atime;  // convert to code unit of acceleration
+        BHP(n).DFAccel[j] *= blackhole_params.BH_DFBoostFactor; // Add a boost factor
     }
     
     
@@ -901,10 +902,15 @@ blackhole_dynfric_postprocess(int n, TreeWalk * tw){
                 BH_GET_PRIV(tw)->BH_DFAccelOld[PI][j] = 0;
             }
         }
-#ifdef DEBUG
-        message(2,"x=%e, log(lambda)=%e, fof_x=%e, Mbh=%e, ratio=%e \n",
-           x,log(lambda),f_of_x,P[n].Mass,BH_GET_PRIV(tw)->BH_DFAccelOld[PI][0]/P[n].FullTreeGravAccel[0]);
-#endif
+// #ifdef DEBUG
+//         message(2,"bmax=%e,x=%e, lambda=%e, fof_x=%e, Mbh=%e, bhvel=%e, acc=%e \n",
+//           blackhole_params.BH_DFbmax, x,lambda,f_of_x,P[n].Mass,bhvel,BH_GET_PRIV(tw)->BH_DFAccelOld[PI][0]);
+          
+        if P[n].ID == 7723277 {
+            message(2,"x=%e, lambda=%e, fof_x=%e, Mbh=%e, bhvel=%e, acc=%e \n",
+          x,lambda,f_of_x,P[n].Mass,bhvel,BH_GET_PRIV(tw)->BH_DFAccelOld[PI][0]);
+        }
+// #endif
     }
     else
     {
@@ -992,8 +998,8 @@ blackhole_dynfric_ngbiter(TreeWalkQueryBHDynfric * I,
                 DM_VelPred(other, VelPred, BH_GET_PRIV(lv->tw)->FgravkickB, BH_GET_PRIV(lv->tw)->gravkicks);
             }
             for(d = 0; d < 3; d++){
-                dx[d] = NEAREST(P[other].Pos[d] - I->base.Pos[d], PartManager->BoxSize);
-                dv[d] = VelPred[d] - I->Vel[d];
+                dx[d] = NEAREST(P[other].Pos[d] - I->base.Pos[d], PartManager->BoxSize); //comoving
+                dv[d] = (VelPred[d] - I->Vel[d])/BH_GET_PRIV(lv->tw)->atime; // proper velocity
             }
             
             float mass_j = P[other].Mass;
@@ -1004,12 +1010,16 @@ blackhole_dynfric_ngbiter(TreeWalkQueryBHDynfric * I,
                 r_proj += dx[d] * dv[d];
                 dv_mag += dv[d] * dv[d];
             }
+            dv_mag = sqrt(dv_mag);
+            r_proj /= dv_mag;
             
             double b_j = 0;
             for(d = 0; d < 3; d++){
-                b_j += (dx[d] - r_proj * dv[d] / dv_mag / dv_mag) * (dx[d] - r_proj * dv[d] / dv_mag / dv_mag);
+                b_j += (dx[d] - r_proj * dv[d] / dv_mag) * (dx[d] - r_proj * dv[d] / dv_mag);
             }
-            double alpha_j = b_j * dv_mag * dv_mag / BH_GET_PRIV(lv->tw)->CP->GravInternal * I->Mass;
+            b_j = sqrt(b_j); //comoving
+            // convert b_j to physical
+            double alpha_j = (b_j*BH_GET_PRIV(lv->tw)->atime) * dv_mag * dv_mag / BH_GET_PRIV(lv->tw)->CP->GravInternal / I->Mass;
             
             double soft_fac;
             double u = r/FORCE_SOFTENING(0,1);
@@ -1023,14 +1033,17 @@ blackhole_dynfric_ngbiter(TreeWalkQueryBHDynfric * I,
             else{
                 soft_fac = 1;
             }
-
+	    // b and r both comoving
             double df_mag = alpha_j * b_j / (1 + alpha_j * alpha_j) / r;
             df_mag *= soft_fac;
+
+	    // scale as a*a, consistent with code accel unit, no extra scale fac needed!
             df_mag *= BH_GET_PRIV(lv->tw)->CP->GravInternal * mass_j / r2;
                 
             for(d = 0; d < 3; d++){
                 O->DFAccel[d] = df_mag * dv[d] / dv_mag;
             }
+	    /*message(2,"bmag=%e, rproj=%e, dvmag=%e, Mbh=%e, alpha=%e, soft=%e, df_mag=%e \n", b_j,r_proj,dv_mag,I->Mass,alpha_j,soft_fac,df_mag);*/
             
             // old
             u = r * iter->dynfric_kernel.Hinv;
