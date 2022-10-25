@@ -360,7 +360,13 @@ void check_smoothing_length(struct part_manager_type * PartManager, double * Mea
  * This also allows us to increase MinEgySpec on a restart if we choose.*/
 void check_density_entropy(Cosmology * CP, const double MinEgySpec, const double atime)
 {
-    const double a3 = pow(atime, 3);
+    if (All.ComovingIntegrationOn){
+        const double a3 = pow(atime, 3);
+    }
+    else {
+        const double a3 = 1.;
+    }
+    
     int i;
     int bad = 0;
     double meanbar = CP->OmegaBaryon * 3 * HUBBLE * CP->HubbleParam * HUBBLE * CP->HubbleParam/ (8 * M_PI * GRAVITY);
@@ -457,13 +463,23 @@ void
 setup_smoothinglengths(int RestartSnapNum, DomainDecomp * ddecomp, Cosmology * CP, int BlackHoleOn, double MinEgySpec, double uu_in_cgs, const inttime_t Ti_Current, const double atime, const int64_t NTotGasInit)
 {
     int i;
-    const double a3 = pow(atime, 3);
+    if (All.ComovingIntegrationOn){
+        const double a3 = pow(atime, 3);
+    }
+    else {
+        const double a3 = 1.;
+    }
 
     if(RestartSnapNum >= 0)
         return;
 
     if(InitParams.InitGasTemp < 0)
-        InitParams.InitGasTemp = CP->CMBTemperature / atime;
+        if (All.ComovingIntegrationOn) {
+            InitParams.InitGasTemp = CP->CMBTemperature / atime;
+        }
+        else {
+            InitParams.InitGasTemp = CP->CMBTemperature;
+        }
 
     const double MeanGasSeparation = PartManager->BoxSize / pow(NTotGasInit, 1.0 / 3);
 

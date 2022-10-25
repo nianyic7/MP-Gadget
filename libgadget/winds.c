@@ -284,8 +284,15 @@ winds_find_weights(TreeWalk * tw, struct WindPriv * priv, int * NewStars, int Nu
     tw->visit = (TreeWalkVisitFunction) treewalk_visit_nolist_ngbiter;
     tw->postprocess = (TreeWalkProcessFunction) sfr_wind_weight_postprocess;
 
-    priv[0].Time = Time;
-    priv[0].hubble = hubble;
+    if (All.ComovingIntegrationOn) {
+        priv[0].Time = Time;
+        priv[0].hubble = hubble;
+    }
+    else {
+        priv[0].Time = 1.0;
+        priv[0].hubble = 1.0;
+    }
+    
     tw->priv = priv;
 
     int64_t totalleft = 0;

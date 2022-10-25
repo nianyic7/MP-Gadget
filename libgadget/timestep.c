@@ -157,7 +157,12 @@ is_PM_timestep(const DriftKickTimes * const times)
 
 double
 get_atime(const inttime_t Ti_Current) {
-    return exp(loga_from_ti(Ti_Current));
+    if (All.ComovingIntegrationOn) {
+        return exp(loga_from_ti(Ti_Current));
+    }
+    else {
+        return loga_from_ti(Ti_Current);
+    }
 }
 
 static int

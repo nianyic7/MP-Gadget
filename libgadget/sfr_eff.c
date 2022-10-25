@@ -196,8 +196,16 @@ cooling_and_starformation(ActiveParticles * act, double Time, const DriftKickTim
     /*Need to capture this so that when NumActiveParticle increases during the loop
      * we don't add extra loop iterations on particles with invalid slots.*/
     const int nactive = act->NumActiveParticle;
-    const double a3inv = 1./(Time * Time * Time);
-    const double hubble = hubble_function(CP, Time);
+    
+    if (All.ComovingIntegrationOn) {
+        const double a3inv = 1./(Time * Time * Time);
+        const double hubble = hubble_function(CP, Time);
+    }
+    else {
+        const double a3inv = 1.0;
+        const double hubble = 1.0;
+    }
+    
 
     if(sfr_params.StarformationOn) {
         /* Maximally we need the active gas particles*/

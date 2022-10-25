@@ -581,11 +581,21 @@ blackhole(const ActiveParticles * act, double atime, Cosmology * CP, ForceTree *
     tw_feedback->tree = tree;
     tw_feedback->priv = priv;
     tw_feedback->repeatdisallowed = 1;
+    
+    if (All.ComovingIntegrationOn) {
+        priv->atime = atime;
+        priv->a3inv = 1./(atime * atime * atime);
+        priv->hubble = hubble_function(CP, atime);
+        priv->CP = CP;
+    }
+    else {
+        priv->atime = 1.;
+        priv->a3inv = 1.;
+        priv->hubble = hubble_function(CP, atime);
+        priv->CP = CP;
+    }
 
-    priv->atime = atime;
-    priv->a3inv = 1./(atime * atime * atime);
-    priv->hubble = hubble_function(CP, atime);
-    priv->CP = CP;
+
 
     priv->FgravkickB = get_exact_gravkick_factor(CP, times->PM_kick, times->Ti_Current);
     memset(priv->gravkicks, 0, sizeof(priv->gravkicks[0])*(TIMEBINS+1));
