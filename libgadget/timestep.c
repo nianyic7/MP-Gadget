@@ -731,7 +731,13 @@ find_timesteps(const ActiveParticles * act, DriftKickTimes * times, const double
         times->PM_start = times->PM_kick;
     }
 
-    const double hubble = hubble_function(CP, atime);
+    if (All.ComovingIntegrationOn) {
+        const double hubble = hubble_function(CP, atime);
+    }
+    else {
+        const double hubble = hubble_function(CP, atime);
+    }
+    
     /* Now assign new timesteps and kick */
     if(TimestepParams.ForceEqualTimesteps) {
         dti_min = find_global_timestep(times, dti_max, atime, hubble);
@@ -981,6 +987,7 @@ do_grav_short_range_kick(struct particle_data * part, const MyFloat * const Grav
 void
 do_hydro_kick(int i, double dt_entr, double Fgravkick, double Fhydrokick, const double atime)
 {
+    /* Non-ComovingIntegration Note: atime = 1 when passed to this function*/
     int j;
     /* Add kick from dynamic friction and hydro drag for BHs. */
     if(P[i].Type == 5) {
@@ -1023,6 +1030,7 @@ do_hydro_kick(int i, double dt_entr, double Fgravkick, double Fhydrokick, const 
 
 static double grav_acceleration2(const int p, const MyFloat * const GravAccel, const double atime)
 {
+    /* Non-ComovingIntegration Note: atime = 1 when passed to this function*/
     /*Compute physical acceleration*/
     const double a2inv = 1/(atime * atime);
     double ax = a2inv * GravAccel[0];
@@ -1041,6 +1049,7 @@ static double grav_acceleration2(const int p, const MyFloat * const GravAccel, c
 static double
 get_timestep_gravity_dloga(const int p, const MyFloat * const GravAccel, const double atime, const double hubble)
 {
+    /* Non-ComovingIntegration Note: atime = 1 when passed to this function*/
     double ac = sqrt(grav_acceleration2(p, GravAccel, atime));
     /* mind the factor 2.8 difference between gravity and softening used here. */
     double dt = sqrt(2 * TimestepParams.ErrTolIntAccuracy * atime * (FORCE_SOFTENING(p, P[p].Type) / 2.8) / ac);
@@ -1053,6 +1062,7 @@ get_timestep_gravity_dloga(const int p, const MyFloat * const GravAccel, const d
 static double
 get_timestep_hydro_dloga(const int p, const inttime_t Ti_Current, const double atime, const double hubble, enum TimeStepType * titype)
 {
+    /* Non-ComovingIntegration Note: atime = 1, hubble = 1 when passed to this function*/
     double dt = 1;
     *titype = TI_ACCEL;
 
@@ -1148,6 +1158,7 @@ print_bad_timebin(const double dloga, const inttime_t dti, const int p, const in
 double
 get_long_range_timestep_dloga(const double atime, const Cosmology * CP, const int FastParticleType, const double asmth)
 {
+    /* Non-ComovingIntegration Note: atime = 1 when passed to this function*/
     int i, type;
     int count[6];
     int64_t count_sum[6];
@@ -1190,7 +1201,13 @@ get_long_range_timestep_dloga(const double atime, const Cosmology * CP, const in
 
     min_mass[5] = min_mass[0];
 
-    const double hubble = hubble_function(CP, atime);
+    if All.ComovingIntegrationOn {
+        const double hubble = hubble_function(CP, atime);
+    }
+    else {
+        const double hubble = 1.0;
+    }
+    
     for(type = 0; type < 6; type++)
     {
         if(count_sum[type] > 0)

@@ -356,7 +356,12 @@ winds_subgrid(int * MaybeWind, int NumMaybeWind, const double Time, Cosmology * 
         int i = MaybeWind ? MaybeWind[n] : n;
         /* Notice that StellarMasses is indexed like PI, not i!*/
         MyFloat sm = StellarMasses[P[i].PI];
-        winds_make_after_sf(i, sm, WINDP(i, priv->Winddata).Vdisp, Time);
+        if (All.ComovingIntegrationOn) {
+            winds_make_after_sf(i, sm, WINDP(i, priv->Winddata).Vdisp, Time);
+        }
+        else {
+            winds_make_after_sf(i, sm, WINDP(i, priv->Winddata).Vdisp, 1.);
+        }
     }
     myfree(priv->Winddata);
     walltime_measure("/Cooling/Wind");

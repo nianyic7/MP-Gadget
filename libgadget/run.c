@@ -344,7 +344,8 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
     write_cpu_log(NumCurrentTiStep, header->TimeSnapshot, fds.FdCPU, Clocks.ElapsedTime); /* produce some CPU usage info */
 
     DriftKickTimes times = init_driftkicktime(ti_init);
-
+    
+    
     double atime = get_atime(times.Ti_Current);
 
     while(1) /* main loop */
@@ -365,7 +366,15 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
         if(newatime < atime)
             endrun(1, "Negative timestep: %g New Time: %g Old time %g!\n", newatime - atime, newatime, atime);
         atime = newatime;
-
+        
+        
+        if (All.ComovingIntegrationOn) {
+            double afac = atime;
+        }
+        else {
+            double afac = 1.;
+        }
+        
         /* Compute the list of particles that cross a lightcone and write it to disc.*/
         if(All.LightconeOn)
             lightcone_compute(atime, PartManager->BoxSize, &All.CP, Ti_Last, Ti_Next);
@@ -421,6 +430,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
 
 
         ActiveParticles Act = init_empty_active_particles(0);
+        /* don't change this atime to 1 as it need to print out the actual time */
         build_active_particles(&Act, &times, NumCurrentTiStep, atime);
 
         set_random_numbers(All.RandomSeed + times.Ti_Current);
@@ -465,7 +475,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
                  * he has never encountered a simulation where this matters in practice, probably because
                  * it would only be important in very dissipative environments where the SPH noise is fairly large
                  * and there is no opportunity for errors to build up.*/
-                hydro_force(&Act, atime, &sph_predicted, times, &All.CP, &gasTree);
+                hydro_force(&Act, afac, &sph_predicted, times, &All.CP, &gasTree);
             }
             /* Scratch data cannot be used checkpoint because FOF does an exchange.*/
             slots_free_sph_pred_data(&sph_predicted);
@@ -473,7 +483,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
 
             /* Hydro half-kick after hydro force, as not done with the gravity.*/
             if(All.HierarchicalGravity)
-                apply_hydro_half_kick(&Act, &All.CP, &times, atime);
+                apply_hydro_half_kick(&Act, &All.CP, &times, afac);
         }
 
         /* The opening criterion for the gravtree
@@ -498,11 +508,14 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             /* Tree freed in PM*/
             ForceTree Tree = {0};
             force_tree_full(&Tree, ddecomp, HybridNuTracer, All.OutputDir);
+            /* Non-ComovingIntegration Note: Doesn't seem to matter is we use log(a) or 1 in here*/
             gravpm_force(&pm, &Tree, &All.CP, atime, units.UnitLength_in_cm, All.OutputDir, header->TimeIC, All.FastParticleType);
 
             /* compute and output energy statistics if desired. */
             if(fds.FdEnergy)
-                energy_statistics(fds.FdEnergy, atime, PartManager);
+                /* Non-ComovingIntegration Note: need afac here as we are using atime purely for computing
+                  physical quantities */
+                energy_statistics(fds.FdEnergy, afac, PartManager);
         }
 
         /* Force tree object, reused if HierarchicalGravity is off.*/
@@ -537,7 +550,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
              * Need a scale factor for entropy and velocity limiters.
              * For hierarchical gravity the short-range kick is done above.
              * Synchronises TiKick and TiDrift for the active particles. */
-            apply_half_kick(&Act, &All.CP, &times, atime);
+            apply_half_kick(&Act, &All.CP, &times, afac);
         }
 
         /* Sets Ti_Kick in the times structure.*/
@@ -586,7 +599,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             /* Do this before sfr and bh so the gas hsml always contains DesNumNgb neighbours.*/
             if(All.MetalReturnOn) {
                 double AvgGasMass = All.CP.OmegaBaryon * 3 * All.CP.Hubble * All.CP.Hubble / (8 * M_PI * All.CP.GravInternal) * pow(PartManager->BoxSize, 3) / header->NTotalInit[0];
-                metal_return(&Act, ddecomp, &All.CP, atime, AvgGasMass);
+                metal_return(&Act, ddecomp, &All.CP, afac, AvgGasMass);
             }
 
             /* this will find new black hole seed halos.
@@ -594,7 +607,9 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
              * so ensure we do not have garbage present when we call this.
              * Also a good idea to only run it on a PM step.
              * This does not break the tree because the new black holes do not move or change mass, just type.*/
-            if (is_PM && ((All.BlackHoleOn && atime >= TimeNextSeedingCheck) ||
+            
+            /* Non-ComovingIntegration Note: disable seeding of BHs for non-cosomological options for now*/
+            if ((All.ComovingIntegrationOn) && is_PM && ((All.BlackHoleOn && atime >= TimeNextSeedingCheck) ||
                 (during_helium_reionization(1/atime - 1) && need_change_helium_ionization_fraction(atime)) ||
                  (CalcUVBG && All.ExcursionSetReionOn))) {
 
@@ -627,11 +642,11 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
              */
             /* Black hole accretion and feedback */
             if(All.BlackHoleOn)
-                blackhole(&Act, atime, &All.CP, &Tree, ddecomp, &times, units, fds.FdBlackHoles, fds.FdBlackholeDetails);
+                blackhole(&Act, afac, &All.CP, &Tree, ddecomp, &times, units, fds.FdBlackHoles, fds.FdBlackholeDetails);
 
             /**** radiative cooling and star formation *****/
             if(All.CoolingOn)
-                cooling_and_starformation(&Act, atime, &times, get_dloga_for_bin(times.mintimebin, times.Ti_Current), &Tree, GravAccel, ddecomp, &All.CP, GradRho_mag, fds.FdSfr);
+                cooling_and_starformation(&Act, afac, &times, get_dloga_for_bin(times.mintimebin, times.Ti_Current), &Tree, GravAccel, ddecomp, &All.CP, GradRho_mag, fds.FdSfr);
         }
         /* We don't need this timestep's tree anymore.*/
         force_tree_free(&Tree);
@@ -661,6 +676,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
         }
 
         /* WriteFOF just reminds the checkpoint code to save GroupID*/
+        /* Non-ComovingIntegration Note: use atime=log(a) here to write snapshots*/
         if(WriteSnapshot)
             write_checkpoint(SnapshotFileCount, WriteFOF, All.MetalReturnOn, atime, &All.CP, All.OutputDir, All.OutputDebugFields);
 
@@ -692,10 +708,10 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
         int badtimestep=0;
         if(!All.HierarchicalGravity) {
             const double asmth = pm.Asmth * PartManager->BoxSize / pm.Nmesh;
-            badtimestep = find_timesteps(&Act, &times, atime, All.FastParticleType, &All.CP, asmth, NumCurrentTiStep == 0);
+            badtimestep = find_timesteps(&Act, &times, afac, All.FastParticleType, &All.CP, asmth, NumCurrentTiStep == 0);
             /* Update velocity and ti_kick to the new step, with the newly computed step size. Unsyncs ti_kick and ti_drift.
              * Both hydro and gravity are kicked.*/
-            apply_half_kick(&Act, &All.CP, &times, atime);
+            apply_half_kick(&Act, &All.CP, &times, afac);
         } else {
             /* This finds the gravity timesteps, computes the gravitational forces
              * and kicks the particles on the gravitational timeline.
@@ -706,9 +722,9 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
                 badtimestep = hierarchical_gravity_and_timesteps(&Act, &pm, ddecomp, GravAccel, &times, atime, HybridNuTracer, All.FastParticleType, &All.CP, All.OutputDir);
             if(GasEnabled) {
                 /* Find hydro timesteps and apply the hydro kick, unsyncing the drift and kick times. */
-                badtimestep += find_hydro_timesteps(&Act, &times, atime, &All.CP, NumCurrentTiStep == 0);
+                badtimestep += find_hydro_timesteps(&Act, &times, afac, &All.CP, NumCurrentTiStep == 0);
                 /* If there is no hydro kick to do we still need to update the kick times.*/
-                apply_hydro_half_kick(&Act, &All.CP, &times, atime);
+                apply_hydro_half_kick(&Act, &All.CP, &times, afac);
             }
         }
         if(badtimestep) {
