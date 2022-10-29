@@ -100,7 +100,7 @@ petapm_module_init(int Nthreads)
 }
 
 void
-petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, MPI_Comm comm)
+petapm_init(PetaPM * pm, double BoxSize, double Xmin[3], double Asmth, int Nmesh, double G, MPI_Comm comm)
 {
     /* define the global long / short range force cut */
     pm->BoxSize = BoxSize;
@@ -109,6 +109,9 @@ petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, MPI_
     pm->G = G;
     pm->CellSize = BoxSize / Nmesh;
     pm->comm = comm;
+    pm->Xmin[0] = Xmin[0];
+    pm->Xmin[1] = Xmin[1];
+    pm->Xmin[2] = Xmin[2];
 
     ptrdiff_t n[3] = {Nmesh, Nmesh, Nmesh};
     ptrdiff_t np[2];

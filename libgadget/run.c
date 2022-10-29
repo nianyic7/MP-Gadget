@@ -318,7 +318,13 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
     int SnapshotFileCount = RestartSnapNum;
 
     PetaPM pm = {0};
-    gravpm_init_periodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal);
+    if (All.NonPeriodic) {
+        gravpm_init_periodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal);
+    }
+    else {
+        gravpm_set_lbox_nonperiodic();
+        gravpm_init_nonperiodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal);
+    }
     /*define excursion set PetaPM structs*/
     /*because we need to FFT 3 grids, and we can't separate sets of regions, we need 3 PetaPM structs */
     /*also, we will need different pencils and layouts due to different zero cells*/
@@ -509,7 +515,12 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             ForceTree Tree = {0};
             force_tree_full(&Tree, ddecomp, HybridNuTracer, All.OutputDir);
             /* Non-ComovingIntegration Note: Doesn't seem to matter is we use log(a) or 1 in here*/
-            gravpm_force(&pm, &Tree, &All.CP, atime, units.UnitLength_in_cm, All.OutputDir, header->TimeIC, All.FastParticleType);
+            if(All.NonPeriodic) {
+                gravpm_force(&pm, &Tree, &All.CP, atime, units.UnitLength_in_cm, All.OutputDir, header->TimeIC, All.FastParticleType);
+            }
+            else {
+                gravpm_force_nonperiodic(&pm, &Tree, &All.CP, atime, units.UnitLength_in_cm, All.OutputDir, header->TimeIC, All.FastParticleType);
+            }
 
             /* compute and output energy statistics if desired. */
             if(fds.FdEnergy)

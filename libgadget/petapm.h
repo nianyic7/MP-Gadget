@@ -68,6 +68,7 @@ typedef struct PetaPM {
     int Nmesh;
     double Asmth;
     double BoxSize;
+    double Xmin[3];
     double G;
     PetaPMPriv priv[1];
     int ThisTask2d[2];
