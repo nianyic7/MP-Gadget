@@ -217,6 +217,7 @@ force_tree_build(int mask, DomainDecomp * ddecomp, const ActiveParticles *act, c
         tree = force_treeallocate(maxnodes, PartManager->MaxPart, ddecomp, alloc_father);
 
         tree.BoxSize = PartManager->BoxSize;
+        tree.NonPeriodic = PartManager->NonPeriodic;
         tree.numnodes = force_tree_create_nodes(tree, act, mask, ddecomp, HybridNuGrav);
         if(tree.numnodes >= tree.lastnode - tree.firstnode)
         {

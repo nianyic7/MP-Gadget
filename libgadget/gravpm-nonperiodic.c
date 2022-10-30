@@ -53,11 +53,12 @@ static struct gravpm_params
 
 
 /* Calculate the box size based on particle positions*/
-void  
+double  
 gravpm_set_lbox_nonperiodic(void) {
     int NumPart = PartManager->NumPart;
     int k;
     int i;
+    double box;
     double Xmin[3] = {1.0e30, 1.0e30, 1.0e30};
     double Xmax[3] = {-1.0e30, -1.0e30, -1.0e30};
     
@@ -85,6 +86,8 @@ gravpm_set_lbox_nonperiodic(void) {
         GravPM.Xmax[i] = Xmax[i];
     }
     GravPM.BoxSize *= 2.;
+    box = GravPM.BoxSize/2.;
+    return box;
 }
 
 

@@ -68,12 +68,14 @@ typedef struct PetaPM {
     int Nmesh;
     double Asmth;
     double BoxSize;
+    double Xmin[3];
     double G;
     PetaPMPriv priv[1];
     int ThisTask2d[2];
     int NTask2d[2];
     int * Mesh2Task[2]; /* conversion from real space mesh to task2d,  */
     Power ps[1];
+    int NonPeriodic;
 } PetaPM;
 
 typedef struct {
@@ -126,7 +128,7 @@ typedef void * (*petapm_mfree_func)(void * ptr);
 
 void petapm_module_init(int Nthreads);
 
-void petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, MPI_Comm comm);
+void petapm_init(PetaPM * pm, double BoxSize, double Xmin[3], double Asmth, int Nmesh, double G, int NonPeriodic, MPI_Comm comm);
 void petapm_destroy(PetaPM * pm);
 void petapm_region_init_strides(PetaPMRegion * region);
 

@@ -100,6 +100,9 @@ extern struct part_manager_type {
     double CurrentParticleOffset[3];
     /* Current box size so we can work out periodic boundaries*/
     double BoxSize;
+    /* Whether we are running a non-periodic sim */
+    /* put it here because it seems to be the only accessible global structure to treewark.c*/
+    int NonPeriodic;
 } PartManager[1];
 
 /*Compatibility define*/

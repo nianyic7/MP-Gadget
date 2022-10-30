@@ -318,9 +318,12 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
 
     PetaPM pm = {0};
     if (All.CP.NonPeriodic) {
+        PartManager->BoxSize = gravpm_set_lbox_nonperiodic();
+        PartManager->NonPeriodic = 1;
         gravpm_init_periodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal, All.CP.NonPeriodic);
     }
     else {
+        PartManager->NonPeriodic = 0;
         gravpm_init_nonperiodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal, All.CP.NonPeriodic);
     }
     /*define excursion set PetaPM structs*/
@@ -330,10 +333,11 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
     PetaPM pm_mass = {0};
     PetaPM pm_star = {0};
     PetaPM pm_sfr = {0};
+    double Xmin[3] = {0.,0.,0.};
     if(All.ExcursionSetReionOn){
-        petapm_init(&pm_mass, PartManager->BoxSize, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
-        petapm_init(&pm_star, PartManager->BoxSize, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
-        petapm_init(&pm_sfr, PartManager->BoxSize, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
+        petapm_init(&pm_mass, PartManager->BoxSize, Xmin, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
+        petapm_init(&pm_star, PartManager->BoxSize, Xmin, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
+        petapm_init(&pm_sfr, PartManager->BoxSize, Xmin, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
     }
 
     DomainDecomp ddecomp[1] = {0};
@@ -390,6 +394,8 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
         else {
             afac = 1.;
         }
+        
+        PartManager->BoxSize = gravpm_set_lbox_nonperiodic();
         
         /* Compute the list of particles that cross a lightcone and write it to disc.*/
         if(All.LightconeOn)
@@ -525,12 +531,9 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             ForceTree Tree = {0};
             force_tree_full(&Tree, ddecomp, HybridNuTracer, All.OutputDir);
             /* Non-ComovingIntegration Note: Doesn't seem to matter is we use log(a) or 1 in here*/
-            if(All.CP.NonPeriodic) {
-                gravpm_force(&pm, &Tree, &All.CP, atime, units.UnitLength_in_cm, All.OutputDir, header->TimeIC, All.FastParticleType);
-            }
-            else {
-                gravpm_force_nonperiodic(&pm, &Tree, &All.CP, atime, units.UnitLength_in_cm, All.OutputDir, header->TimeIC, All.FastParticleType);
-            }
+
+            gravpm_force(&pm, &Tree, &All.CP, atime, units.UnitLength_in_cm, All.OutputDir, header->TimeIC, All.FastParticleType);
+
 
             /* compute and output energy statistics if desired. */
             if(fds.FdEnergy)

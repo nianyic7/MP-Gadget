@@ -47,11 +47,67 @@ static struct gravpm_params
     Cosmology * CP;
     int FastParticleType;
     double UnitLength_in_cm;
+    double Xmax[3],Xmin[3];
 } GravPM;
 
+
+/* Calculate the box size based on particle positions*/
+double  
+gravpm_set_lbox_nonperiodic(void) {
+    int NumPart = PartManager->NumPart;
+    int k;
+    int i;
+    double box;
+    double Xmin[3] = {1.0e30, 1.0e30, 1.0e30};
+    double Xmax[3] = {-1.0e30, -1.0e30, -1.0e30};
+    
+    #pragma omp parallel for
+    for(i = 0; i < NumPart; i ++) {
+        for(k = 0; k < 3; k ++) {
+            if(Xmin[k] > P[i].Pos[k])
+            Xmin[k] = P[i].Pos[k];
+            if(Xmax[k] < P[i].Pos[k])
+            Xmax[k] = P[i].Pos[k];
+        }
+    }
+    
+    MPI_Allreduce(MPI_IN_PLACE, &Xmin, 3, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, &Xmax, 3, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+
+    box = Xmax[0] - Xmin[0];
+    if ((Xmax[1] - Xmin[1]) > box)
+        box = Xmax[1] - Xmin[1];
+    if ((Xmax[2] - Xmin[2]) > box)
+        box = Xmax[2] - Xmin[2];
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    /* redefine xmax by boxsize */
+    for(i = 0; i < 3; i++) {
+        Xmax[i] = Xmin[i] + box;
+        GravPM.Xmin[i] = Xmin[i];
+        GravPM.Xmax[i] = Xmax[i];
+    }
+
+    return box;
+}
+
+
 void
-gravpm_init_periodic(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G) {
-    petapm_init(pm, BoxSize, Asmth, Nmesh, G, MPI_COMM_WORLD);
+gravpm_init_nonperiodic(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, int NonPeriodic) {
+/* does not matter if we use any boxsize in initialization because it's only used to inform pm->BoxSize
+  we will be okay if we substitute pm->BoxSize to GravPM->BoxSize properly */
+  double Xmin[3];
+  for(int k = 0; k < 3; k ++) {
+      Xmin[k] = GravPM.Xmin[k];
+  }
+  petapm_init(pm, 2*BoxSize, Xmin, Asmth, 2*Nmesh, G, NonPeriodic, MPI_COMM_WORLD);
+}
+
+
+void
+gravpm_init_periodic(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, int NonPeriodic) {
+    double Xmin[3] = {0., 0., 0.};
+    petapm_init(pm, BoxSize, Xmin, Asmth, Nmesh, G, NonPeriodic, MPI_COMM_WORLD);
 }
 
 /* Computes the gravitational force on the PM grid

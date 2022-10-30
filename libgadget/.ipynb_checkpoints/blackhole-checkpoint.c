@@ -581,11 +581,21 @@ blackhole(const ActiveParticles * act, double atime, Cosmology * CP, ForceTree *
     tw_feedback->tree = tree;
     tw_feedback->priv = priv;
     tw_feedback->repeatdisallowed = 1;
+    
+    if (CP->ComovingIntegrationOn) {
+        priv->atime = atime;
+        priv->a3inv = 1./(atime * atime * atime);
+        priv->hubble = hubble_function(CP, atime);
+        priv->CP = CP;
+    }
+    else {
+        priv->atime = 1.;
+        priv->a3inv = 1.;
+        priv->hubble = 1.;
+        priv->CP = CP;
+    }
 
-    priv->atime = atime;
-    priv->a3inv = 1./(atime * atime * atime);
-    priv->hubble = hubble_function(CP, atime);
-    priv->CP = CP;
+
 
     priv->FgravkickB = get_exact_gravkick_factor(CP, times->PM_kick, times->Ti_Current);
     memset(priv->gravkicks, 0, sizeof(priv->gravkicks[0])*(TIMEBINS+1));
@@ -1201,8 +1211,9 @@ blackhole_accretion_ngbiter(TreeWalkQueryBHAccretion * I,
             MyFloat VelPred[3];
             DM_VelPred(other, VelPred, BH_GET_PRIV(lv->tw)->FgravkickB, BH_GET_PRIV(lv->tw)->gravkicks);
             for(d = 0; d < 3; d++){
-                if (All.NonPeriodic) {
+                if (BH_GET_PRIV(lv->tw)->CP->NonPeriodic) {
                     dx[d] = I->base.Pos[d] - P[other].Pos[d];
+                }
                 else {
                     dx[d] = NEAREST(I->base.Pos[d] - P[other].Pos[d], PartManager->BoxSize);
                 }

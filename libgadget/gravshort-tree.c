@@ -216,12 +216,13 @@ shall_we_discard_node(const double len, const double r2, const double center[3],
         int i;
         /*This checks whether we are also outside this region of the oct-tree*/
         /* As long as one dimension is outside, we are fine*/
-        for(i=0; i < 3; i++)
-            if (NonPeriodic) && (fabs(center[i] - inpos[i]) > eff_dist) {
+        for(i=0; i < 3; i++) {
+            if ((NonPeriodic) && (fabs(center[i] - inpos[i]) > eff_dist)) {
                 return 1;
             }
             else if (fabs(NEAREST(center[i] - inpos[i], BoxSize)) > eff_dist) {
                 return 1;
+            }
         }
             
     }
