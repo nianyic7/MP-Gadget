@@ -36,7 +36,9 @@ void gravshort_set_softenings(double MeanDMSeparation);
 double FORCE_SOFTENING(int i, int type);
 
 /*Defined in gravpm.c*/
-void gravpm_init_periodic(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G);
+void gravpm_init_periodic(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, int NonPeriodic);
+void gravpm_init_nonperiodic(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, int NonPeriodic);
+void gravpm_set_lbox_nonperiodic(void);
 
 /* Apply the short-range window function, which includes the smoothing kernel.*/
 int grav_apply_short_range_window(double r, double * fac, double * pot, const double cellsize);

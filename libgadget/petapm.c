@@ -100,7 +100,7 @@ petapm_module_init(int Nthreads)
 }
 
 void
-petapm_init(PetaPM * pm, double BoxSize, double Xmin[3], double Asmth, int Nmesh, double G, MPI_Comm comm)
+petapm_init(PetaPM * pm, double BoxSize, double Xmin[3], double Asmth, int Nmesh, double G, int NonPeriodic, MPI_Comm comm)
 {
     /* define the global long / short range force cut */
     pm->BoxSize = BoxSize;
@@ -112,6 +112,7 @@ petapm_init(PetaPM * pm, double BoxSize, double Xmin[3], double Asmth, int Nmesh
     pm->Xmin[0] = Xmin[0];
     pm->Xmin[1] = Xmin[1];
     pm->Xmin[2] = Xmin[2];
+    pm->NonPeriodic = NonPeriodic;
 
     ptrdiff_t n[3] = {Nmesh, Nmesh, Nmesh};
     ptrdiff_t np[2];
@@ -979,7 +980,9 @@ pm_iterate_one(PetaPM * pm,
 
     PetaPMRegion * region = &regions[RegionInd];
     for(k = 0; k < 3; k++) {
-        double tmp = Pos[k] / pm->CellSize;
+        /* take into account the position offset for non-periodic cases*/
+        /* Xmin = 0 for the periodic case */
+        double tmp = (Pos[k] - pm->Xmin[k]) / pm->CellSize;
         iCell[k] = floor(tmp);
         Res[k] = tmp - iCell[k];
         iCell[k] -= region->offset[k];

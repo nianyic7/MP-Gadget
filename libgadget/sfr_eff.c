@@ -112,7 +112,7 @@ struct sfr_eeqos_data
 static struct sfr_eeqos_data get_sfr_eeqos(struct particle_data * part, struct sph_particle_data * sph, double dtime, struct UVBG *local_uvbg, const double redshift, const double a3inv);
 
 /*Cooling only: no star formation*/
-static void cooling_direct(int i, const double redshift, const double a3inv, const double hubble, const struct UVBG * const GlobalUVBG);
+static void cooling_direct(int i, const double redshift, const double a3inv, const double hubble, const struct UVBG * const GlobalUVBG, const int ComovingIntegrationOn);
 
 static void cooling_relaxed(int i, double dtime, struct UVBG * local_uvbg, const double redshift, const double a3inv, struct sfr_eeqos_data sfr_data, const struct UVBG * const GlobalUVBG);
 
@@ -197,13 +197,14 @@ cooling_and_starformation(ActiveParticles * act, double Time, const DriftKickTim
      * we don't add extra loop iterations on particles with invalid slots.*/
     const int nactive = act->NumActiveParticle;
     
-    if (All.ComovingIntegrationOn) {
-        const double a3inv = 1./(Time * Time * Time);
-        const double hubble = hubble_function(CP, Time);
+    double a3inv, hubble;
+    if (CP->ComovingIntegrationOn) {
+        a3inv = 1./(Time * Time * Time);
+        hubble = hubble_function(CP, Time);
     }
     else {
-        const double a3inv = 1.0;
-        const double hubble = 1.0;
+        a3inv = 1.0;
+        hubble = 1.0;
     }
     
 
@@ -225,11 +226,12 @@ cooling_and_starformation(ActiveParticles * act, double Time, const DriftKickTim
 
 
     /* Get the global UVBG for this redshift. */
-    if (All.ComovingIntegrationOn) {
-        const double redshift = 1./Time - 1;
+    double redshift;
+    if (CP->ComovingIntegrationOn) {
+        redshift = 1./Time - 1;
     }
     else {
-        const double redshift = 0.;
+        redshift = 0.;
     }
     
     struct UVBG GlobalUVBG = get_global_UVBG(redshift);
@@ -289,7 +291,7 @@ cooling_and_starformation(ActiveParticles * act, double Time, const DriftKickTim
                 }
             }
             else
-                cooling_direct(p_i, redshift, a3inv, hubble, &GlobalUVBG);
+                cooling_direct(p_i, redshift, a3inv, hubble, &GlobalUVBG, CP->ComovingIntegrationOn);
         }
     }
 
@@ -455,7 +457,7 @@ sfr_reserve_slots(ActiveParticles * act, int * NewStars, int NumNewStar, ForceTr
 }
 
 static void
-cooling_direct(int i, const double redshift, const double a3inv, const double hubble, const struct UVBG * const GlobalUVBG)
+cooling_direct(int i, const double redshift, const double a3inv, const double hubble, const struct UVBG * const GlobalUVBG, const int ComovingIntegrationOn)
 {
     /*  the actual time-step */
     double dloga = get_dloga_for_bin(P[i].TimeBinHydro, P[i].Ti_drift);
@@ -470,13 +472,14 @@ cooling_direct(int i, const double redshift, const double a3inv, const double hu
 
     struct UVBG uvbg = get_local_UVBG(redshift, GlobalUVBG, P[i].Pos, PartManager->CurrentParticleOffset, SPHP(i).local_J21, SPHP(i).zreion);
     
-    if (All.ComovingIntegrationOn) {
-        double lasttime = exp(loga_from_ti(P[i].Ti_drift - dti_from_timebin(P[i].TimeBinHydro)));
-        double lastred = 1/lasttime - 1;
+    double lasttime, lastred;
+    if (ComovingIntegrationOn) {
+        lasttime = exp(loga_from_ti(P[i].Ti_drift - dti_from_timebin(P[i].TimeBinHydro)));
+        lastred = 1/lasttime - 1;
     }
     else {
-        double lasttime = 1.;
-        double lastred = 0.;
+        lasttime = 1.;
+        lastred = 0.;
     }
     double unew;
     /* The particle reionized this timestep, bump the temperature to the HI reionization temperature.

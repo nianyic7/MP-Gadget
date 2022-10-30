@@ -84,14 +84,16 @@ gravpm_set_lbox_nonperiodic(void) {
         GravPM.Xmin[i] = Xmin[i];
         GravPM.Xmax[i] = Xmax[i];
     }
+    GravPM.BoxSize *= 2.;
 }
 
 
 void
-gravpm_init_nonperiodic(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G) {
+gravpm_init_nonperiodic(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, int NonPeriodic) {
 /* does not matter if we use any boxsize in initialization because it's only used to inform pm->BoxSize
   we will be okay if we substitute pm->BoxSize to GravPM->BoxSize properly */
-    petapm_init(pm, 2*BoxSize, GravPM->Xmin, Asmth, 2*Nmesh, G, MPI_COMM_WORLD);
+    gravpm_set_lbox_nonperiodic();
+    petapm_init(pm, GravPM.BoxSize, GravPM->Xmin, Asmth, 2*Nmesh, G, NonPeriodic, MPI_COMM_WORLD);
 }
 
 /* Computes the gravitational force on the PM grid
@@ -133,6 +135,8 @@ gravpm_force_nonperiodic(PetaPM * pm, ForceTree * tree, Cosmology * CP, double T
      * Therefore the force transfer functions are based on the potential,
      * not the density.
      * */
+     
+    gravpm_set_lbox_nonperiodic();  /* Find the New box size (GravPM.BoxSize is already double the particle range) */
     petapm_force(pm, _prepare, &global_functions, functions, &pstruct, tree);
     powerspectrum_sum(pm->ps);
     /*Now save the power spectrum*/
@@ -231,7 +235,7 @@ static PetaPMRegion * _prepare(PetaPM * pm, PetaPMParticleStruct * pstruct, void
     if(force_tree_allocated(tree)) force_tree_free(tree);
 
     /*Allocate memory for a power spectrum*/
-    powerspectrum_alloc(pm->ps, pm->Nmesh, omp_get_max_threads(), GravPM.CP->MassiveNuLinRespOn, GravPM->BoxSize*GravPM.UnitLength_in_cm);
+    powerspectrum_alloc(pm->ps, pm->Nmesh, omp_get_max_threads(), GravPM.CP->MassiveNuLinRespOn, GravPM.BoxSize*GravPM.UnitLength_in_cm);
 
     walltime_measure("/PMgrav/Regions");
     return regions;
@@ -285,7 +289,7 @@ static int pm_mark_region_for_node(int startno, int rid, int * RegionInd, const 
 
 static void convert_node_to_region(PetaPM * pm, PetaPMRegion * r, struct NODE * Nodes) {
     int k;
-    double cellsize = GravPM->BoxSize / pm->Nmesh;
+    double cellsize = GravPM.BoxSize / pm->Nmesh;
     int no = r->no;
 #if 0
     printf("task = %d no = %d len = %g hmax = %g center = %g %g %g\n",
@@ -359,7 +363,7 @@ potential_transfer(PetaPM * pm, int64_t k2, int kpos[3], pfft_complex *value)
         /* fac is - 4pi G     (L / 2pi) **2 / L ** 3
      *        Gravity       k2            DFT (dk **3, but )
      * */
-    const double pot_factor = - pm->G / (M_PI * GravPM->BoxSize);	/* to get potential */
+    const double pot_factor = - pm->G / (M_PI * GravPM.BoxSize);	/* to get potential */
 
 
     /* the CIC deconvolution kernel is
@@ -451,7 +455,7 @@ static void force_transfer(PetaPM * pm, int k, pfft_complex * value) {
      *
      * filter is   i K(w)
      * */
-    double fac = -1 * diff_kernel (k * (2 * M_PI / pm->Nmesh)) * (pm->Nmesh / GravPM->BoxSize);
+    double fac = -1 * diff_kernel (k * (2 * M_PI / pm->Nmesh)) * (pm->Nmesh / GravPM.BoxSize);
     tmp0 = - value[0][1] * fac;
     tmp1 = value[0][0] * fac;
     value[0][0] = tmp0;

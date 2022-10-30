@@ -50,9 +50,9 @@ static struct gravpm_params
 } GravPM;
 
 void
-gravpm_init_periodic(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G) {
+gravpm_init_periodic(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, int NonPeriodic) {
     double Xmin[3] = {0., 0., 0.};
-    petapm_init(pm, BoxSize, Xmin, Asmth, Nmesh, G, MPI_COMM_WORLD);
+    petapm_init(pm, BoxSize, Xmin, Asmth, Nmesh, G, NonPeriodic, MPI_COMM_WORLD);
 }
 
 /* Computes the gravitational force on the PM grid

@@ -19,7 +19,7 @@
  * receives a shift vector removing the previous random shift and adding a new one.
  * This function also updates the velocity and updates the density according to an adiabatic factor.
  */
-void real_drift_particle(struct particle_data * pp, struct slots_manager_type * sman, const double ddrift, const double BoxSize, const double random_shift[3])
+void real_drift_particle(struct particle_data * pp, struct slots_manager_type * sman, const double ddrift, const double BoxSize, const double random_shift[3], const int NonPeriodic)
 {
     int j;
     if(pp->IsGarbage || pp->Swallowed) {
@@ -40,14 +40,15 @@ void real_drift_particle(struct particle_data * pp, struct slots_manager_type * 
     if(BHGetRepositionEnabled() && pp->Type == 5) {
         int k;
         int pi = pp->PI;
+        double dx;
         struct bh_particle_data * BH = (struct bh_particle_data *) sman->info[5].ptr;
         if (BH[pi].JumpToMinPot) {
             for(k = 0; k < 3; k++) {
-                if (All.NonPeriodic) {
-                    double dx = pp->Pos[k] - BH[pi].MinPotPos[k];
+                if (NonPeriodic) {
+                    dx = pp->Pos[k] - BH[pi].MinPotPos[k];
                 }
                 else {
-                    double dx = NEAREST(pp->Pos[k] - BH[pi].MinPotPos[k], BoxSize);
+                    dx = NEAREST(pp->Pos[k] - BH[pi].MinPotPos[k], BoxSize);
                 }
                 if(dx > 0.1 * BoxSize) {
                     endrun(1, "Drifting blackhole very far, from %g %g %g to %g %g %g id = %ld. Likely due to the time step is too sparse.\n",
@@ -108,7 +109,7 @@ void drift_all_particles(inttime_t ti0, inttime_t ti1, Cosmology * CP, const dou
         if(PartManager->Base[i].Ti_drift != ti0)
             endrun(10, "Drift time mismatch: (ids = %ld %ld) %d != %d\n",PartManager->Base[0].ID, PartManager->Base[i].ID, ti0,  PartManager->Base[i].Ti_drift);
 #endif
-        real_drift_particle(&PartManager->Base[i], SlotsManager, ddrift, PartManager->BoxSize, random_shift);
+        real_drift_particle(&PartManager->Base[i], SlotsManager, ddrift, PartManager->BoxSize, random_shift, CP->NonPeriodic);
         PartManager->Base[i].Ti_drift = ti1;
     }
 

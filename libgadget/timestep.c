@@ -157,10 +157,7 @@ is_PM_timestep(const DriftKickTimes * const times)
 
 double
 get_atime(const inttime_t Ti_Current) {
-    if (All.ComovingIntegrationOn) 
-        return exp(loga_from_ti(Ti_Current));
-    else
-        return loga_from_ti(Ti_Current);
+    return exp(loga_from_ti(Ti_Current));
 }
 
 static int
@@ -730,12 +727,13 @@ find_timesteps(const ActiveParticles * act, DriftKickTimes * times, const double
         times->PM_length = dti_max;
         times->PM_start = times->PM_kick;
     }
-
-    if (All.ComovingIntegrationOn) {
-        const double hubble = hubble_function(CP, atime);
+    
+    double hubble;
+    if (CP->ComovingIntegrationOn) {
+        hubble = hubble_function(CP, atime);
     }
     else {
-        const double hubble = hubble_function(CP, atime);
+        hubble = 1.0;
     }
     
     /* Now assign new timesteps and kick */
@@ -1164,6 +1162,7 @@ get_long_range_timestep_dloga(const double atime, const Cosmology * CP, const in
     int64_t count_sum[6];
     double v[6], v_sum[6], mim[6], min_mass[6];
     double dloga = TimestepParams.MaxSizeTimestep;
+    double hubble;
 
     for(type = 0; type < 6; type++)
     {
@@ -1201,11 +1200,11 @@ get_long_range_timestep_dloga(const double atime, const Cosmology * CP, const in
 
     min_mass[5] = min_mass[0];
 
-    if All.ComovingIntegrationOn {
-        const double hubble = hubble_function(CP, atime);
+    if (CP->ComovingIntegrationOn) {
+        hubble = hubble_function(CP, atime);
     }
     else {
-        const double hubble = 1.0;
+        hubble = 1.0;
     }
     
     for(type = 0; type < 6; type++)

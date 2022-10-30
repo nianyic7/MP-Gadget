@@ -284,7 +284,7 @@ winds_find_weights(TreeWalk * tw, struct WindPriv * priv, int * NewStars, int Nu
     tw->visit = (TreeWalkVisitFunction) treewalk_visit_nolist_ngbiter;
     tw->postprocess = (TreeWalkProcessFunction) sfr_wind_weight_postprocess;
 
-    if (All.ComovingIntegrationOn) {
+    if (CP->ComovingIntegrationOn) {
         priv[0].Time = Time;
         priv[0].hubble = hubble;
     }
@@ -356,7 +356,7 @@ winds_subgrid(int * MaybeWind, int NumMaybeWind, const double Time, Cosmology * 
         int i = MaybeWind ? MaybeWind[n] : n;
         /* Notice that StellarMasses is indexed like PI, not i!*/
         MyFloat sm = StellarMasses[P[i].PI];
-        if (All.ComovingIntegrationOn) {
+        if (CP->ComovingIntegrationOn) {
             winds_make_after_sf(i, sm, WINDP(i, priv->Winddata).Vdisp, Time);
         }
         else {

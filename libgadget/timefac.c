@@ -16,10 +16,11 @@
 /* Integrand for the drift table*/
 static double drift_integ(double a, void *param)
 {
-  if (!All.ComovingIntegrationOn)
-      return 1
+
       
   Cosmology * CP = (Cosmology *) param;
+  if (!CP.ComovingIntegrationOn)
+      return 1
   double h = hubble_function(CP, a);
   return 1 / (h * a * a * a);
 }
@@ -27,10 +28,10 @@ static double drift_integ(double a, void *param)
 /* Integrand for the gravkick table*/
 static double gravkick_integ(double a, void *param)
 {
-  if (!All.ComovingIntegrationOn)
-      return 1
       
   Cosmology * CP = (Cosmology *) param;
+  if (!CP.ComovingIntegrationOn)
+      return 1
   double h = hubble_function(CP, a);
 
   return 1 / (h * a * a);
@@ -40,10 +41,9 @@ static double gravkick_integ(double a, void *param)
  * Note this is the same function as drift.*/
 static double hydrokick_integ(double a, void *param)
 {
-  if (!All.ComovingIntegrationOn)
-      return 1
-
   Cosmology * CP = (Cosmology *) param;
+  if (!CP.ComovingIntegrationOn)
+      return 1
   double h = hubble_function(CP, a);
 
   return 1 / (h * pow(a, 3 * GAMMA_MINUS1) * a);
@@ -56,7 +56,7 @@ static double get_exact_factor(Cosmology * CP, inttime_t t0, inttime_t t1, doubl
     double a0, a1;
     if(t0 == t1)
         return 0;
-    if (All.ComovingIntegratonOn) {
+    if (CP.ComovingIntegratonOn) {
         a0 = exp(loga_from_ti(t0));
         a1 = exp(loga_from_ti(t1));
     }

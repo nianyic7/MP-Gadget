@@ -152,9 +152,8 @@ set_all_global_params(ParameterSet * ps)
         All.RandomParticleOffset /= All.Nmesh;
         
         /********** Non-Comsological Flags ***************/
-        All.PMGravOn = param_get_int(ps, "PMGravOn");
-        All.NonPeriodic = param_get_int(ps, "NonPeriodic");
-        All.ComovingIntegrationOn = param_get_int(ps, "ComovingIntegrationOn");
+        All.CP.NonPeriodic = param_get_int(ps, "NonPeriodic");
+        All.CP.ComovingIntegrationOn = param_get_int(ps, "ComovingIntegrationOn");
         
 
         All.SlotsIncreaseFactor = param_get_double(ps, "SlotsIncreaseFactor");
@@ -318,12 +317,11 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
     int SnapshotFileCount = RestartSnapNum;
 
     PetaPM pm = {0};
-    if (All.NonPeriodic) {
-        gravpm_init_periodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal);
+    if (All.CP.NonPeriodic) {
+        gravpm_init_periodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal, All.CP.NonPeriodic);
     }
     else {
-        gravpm_set_lbox_nonperiodic();
-        gravpm_init_nonperiodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal);
+        gravpm_init_nonperiodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal, All.CP.NonPeriodic);
     }
     /*define excursion set PetaPM structs*/
     /*because we need to FFT 3 grids, and we can't separate sets of regions, we need 3 PetaPM structs */
@@ -333,9 +331,9 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
     PetaPM pm_star = {0};
     PetaPM pm_sfr = {0};
     if(All.ExcursionSetReionOn){
-        petapm_init(&pm_mass, PartManager->BoxSize, All.Asmth, All.UVBGdim, All.CP.GravInternal, MPI_COMM_WORLD);
-        petapm_init(&pm_star, PartManager->BoxSize, All.Asmth, All.UVBGdim, All.CP.GravInternal, MPI_COMM_WORLD);
-        petapm_init(&pm_sfr, PartManager->BoxSize, All.Asmth, All.UVBGdim, All.CP.GravInternal, MPI_COMM_WORLD);
+        petapm_init(&pm_mass, PartManager->BoxSize, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
+        petapm_init(&pm_star, PartManager->BoxSize, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
+        petapm_init(&pm_sfr, PartManager->BoxSize, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
     }
 
     DomainDecomp ddecomp[1] = {0};
@@ -353,6 +351,14 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
     
     
     double atime = get_atime(times.Ti_Current);
+    if (!All.CP.ComovingIntegrationOn) {
+        atime = log(atime);
+    }
+    double afac = atime;
+    
+    if (!All.CP.ComovingIntegrationOn) {
+        afac = 1.;
+    }
 
     while(1) /* main loop */
     {
@@ -369,16 +375,20 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
 
         /*Convert back to floating point time*/
         double newatime = get_atime(times.Ti_Current);
+        
+        if (!All.CP.ComovingIntegrationOn) {
+            newatime = log(newatime);
+        }
         if(newatime < atime)
             endrun(1, "Negative timestep: %g New Time: %g Old time %g!\n", newatime - atime, newatime, atime);
         atime = newatime;
         
         
-        if (All.ComovingIntegrationOn) {
-            double afac = atime;
+        if (All.CP.ComovingIntegrationOn) {
+            afac = atime;
         }
         else {
-            double afac = 1.;
+            afac = 1.;
         }
         
         /* Compute the list of particles that cross a lightcone and write it to disc.*/
@@ -515,7 +525,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             ForceTree Tree = {0};
             force_tree_full(&Tree, ddecomp, HybridNuTracer, All.OutputDir);
             /* Non-ComovingIntegration Note: Doesn't seem to matter is we use log(a) or 1 in here*/
-            if(All.NonPeriodic) {
+            if(All.CP.NonPeriodic) {
                 gravpm_force(&pm, &Tree, &All.CP, atime, units.UnitLength_in_cm, All.OutputDir, header->TimeIC, All.FastParticleType);
             }
             else {
@@ -620,7 +630,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
              * This does not break the tree because the new black holes do not move or change mass, just type.*/
             
             /* Non-ComovingIntegration Note: disable seeding of BHs for non-cosomological options for now*/
-            if ((All.ComovingIntegrationOn) && is_PM && ((All.BlackHoleOn && atime >= TimeNextSeedingCheck) ||
+            if ((All.CP.ComovingIntegrationOn) && is_PM && ((All.BlackHoleOn && atime >= TimeNextSeedingCheck) ||
                 (during_helium_reionization(1/atime - 1) && need_change_helium_ionization_fraction(atime)) ||
                  (CalcUVBG && All.ExcursionSetReionOn))) {
 
@@ -779,11 +789,11 @@ void
 runfof(const int RestartSnapNum, const inttime_t Ti_Current, const struct header_data * header)
 {
     PetaPM pm = {0};
-    if (All.NonPeriodic){
-    	gravpm_init_nonperiodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal);
+    if (All.CP.NonPeriodic){
+    	gravpm_init_nonperiodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal, All.CP.NonPeriodic);
     }
     else{
-	gravpm_init_periodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal);
+        gravpm_init_periodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal, All.CP.NonPeriodic);
     }
 
     DomainDecomp ddecomp[1] = {0};
@@ -822,7 +832,7 @@ void
 runpower(const struct header_data * header)
 {
     PetaPM pm = {0};
-    gravpm_init_periodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal);
+    gravpm_init_periodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal, All.CP.NonPeriodic);
     DomainDecomp ddecomp[1] = {0};
     /* ... read in initial model */
     domain_decompose_full(ddecomp);	/* do initial domain decomposition (gives equal numbers of particles) */
