@@ -286,7 +286,7 @@ petaio_read_snapshot(int num, const char * OutputDir, Cosmology * CP, struct hea
     /* Always try to read the metal tables.
      * This lets us turn it off for a short period and then re-enable it.
      * Note the metal fields are non-fatal so this does not break resuming without metals.*/
-    register_io_blocks(IOTable, 0, 1);
+    register_io_blocks(IOTable, 0, 1, CP->ComovingIntegrationOn);
 
     for(i = 0; i < IOTable->used; i ++) {
         /* only process the particle blocks */
@@ -303,6 +303,13 @@ petaio_read_snapshot(int num, const char * OutputDir, Cosmology * CP, struct hea
             keep |= (0 == strcmp(IOTable->ent[i].name, "Position"));
             keep |= (0 == strcmp(IOTable->ent[i].name, "Velocity"));
             keep |= (0 == strcmp(IOTable->ent[i].name, "ID"));
+            
+            if (!CP->ComovingIntegrationOn) {
+                if (ptype == 0) {
+                     keep |= (0 == strcmp(IOTable->ent[i].name, "Entropy"));
+                     keep |= (0 == strcmp(IOTable->ent[i].name, "Density"));
+                }
+            }
             if (ptype == 5) {
                 keep |= (0 == strcmp(IOTable->ent[i].name, "Mass"));
                 keep |= (0 == strcmp(IOTable->ent[i].name, "BlackholeMass"));
@@ -914,7 +921,7 @@ static int order_by_type(const void *a, const void *b)
     return 0;
 }
 
-void register_io_blocks(struct IOTable * IOTable, int WriteGroupID, int MetalReturnOn)
+void register_io_blocks(struct IOTable * IOTable, int WriteGroupID, int MetalReturnOn, int ComovingIntegrationOn)
 {
     int i;
     IOTable->used = 0;
@@ -954,9 +961,10 @@ void register_io_blocks(struct IOTable * IOTable, int WriteGroupID, int MetalRet
     IO_REG(InternalEnergy,   "f4", 1, 0, IOTable);
 
     /* Cooling */
-    IO_REG(ElectronAbundance,       "f4", 1, 0, IOTable);
-    IO_REG_WRONLY(NeutralHydrogenFraction, "f4", 1, 0, IOTable);
-
+    if (ComovingIntegrationOn) {
+    	IO_REG(ElectronAbundance,       "f4", 1, 0, IOTable);
+    	IO_REG_WRONLY(NeutralHydrogenFraction, "f4", 1, 0, IOTable);
+    }
     if(IO.OutputHeliumFractions) {
         IO_REG_WRONLY(HeliumIFraction, "f4", 1, 0, IOTable);
         IO_REG_WRONLY(HeliumIIFraction, "f4", 1, 0, IOTable);
@@ -971,6 +979,7 @@ void register_io_blocks(struct IOTable * IOTable, int WriteGroupID, int MetalRet
     IO_REG_NONFATAL(DelayTime,  "f4", 1, 0, IOTable);
 
     IO_REG_NONFATAL(BirthDensity, "f4", 1, 4, IOTable);
+
     IO_REG_TYPE(StarFormationTime, "f4", 1, 4, IOTable);
     IO_REG_TYPE(Metallicity,       "f4", 1, 0, IOTable);
     IO_REG_TYPE(Metallicity,       "f4", 1, 4, IOTable);

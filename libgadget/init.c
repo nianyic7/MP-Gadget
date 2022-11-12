@@ -100,9 +100,11 @@ inttime_t init(int RestartSnapNum, const char * OutputDir, struct header_data * 
     petaio_read_snapshot(RestartSnapNum, OutputDir, CP, header, PartManager, SlotsManager, MPI_COMM_WORLD);
 
     domain_test_id_uniqueness(PartManager);
-
-    check_omega(PartManager, CP, get_generations(), header->MassTable);
-
+    
+    if (CP->ComovingIntegrationOn) {
+        check_omega(PartManager, CP, get_generations(), header->MassTable);
+    }
+    
     check_positions(PartManager);
 
     double MeanSeparation[6] = {0};
@@ -169,7 +171,9 @@ inttime_t init(int RestartSnapNum, const char * OutputDir, struct header_data * 
             SPHP(i).Density = -1;
             SPHP(i).EgyWtDensity = -1;
             SPHP(i).DhsmlEgyDensityFactor = -1;
-            SPHP(i).Entropy = -1;
+            if (CP->ComovingIntegrationOn)
+                SPHP(i).Entropy = -1;
+                
             SPHP(i).Ne = 1.0;
             SPHP(i).DivVel = 0;
             SPHP(i).CurlVel = 0;

@@ -75,7 +75,7 @@ run_gravity_test(int RestartSnapNum, Cosmology * CP, const double Asmth, const i
 
     struct IOTable IOTable = {0};
     /* NO metals written*/
-    register_io_blocks(&IOTable, 0, 0);
+    register_io_blocks(&IOTable, 0, 0, CP->ComovingIntegrationOn);
     register_extra_blocks(&IOTable);
 
     double (* PairAccn)[3] = (double (*) [3]) mymalloc2("PairAccns", 3*sizeof(double) * PartManager->NumPart);

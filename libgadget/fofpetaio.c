@@ -71,7 +71,7 @@ void fof_save_particles(FOFGroups * fof, const char * OutputDir, const char * FO
 
     if(SaveParticles) {
         struct IOTable IOTable = {0};
-        register_io_blocks(&IOTable, 1, MetalReturnOn);
+        register_io_blocks(&IOTable, 1, MetalReturnOn, CP->ComovingIntegrationOn);
         struct part_manager_type halo_pman = {0};
         struct slots_manager_type halo_sman = {0};
         if(fof_distribute_particles(&halo_pman, &halo_sman, Comm)) {
