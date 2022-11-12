@@ -770,7 +770,7 @@ find_timesteps(const ActiveParticles * act, DriftKickTimes * times, const double
                 enum TimeStepType titype_hydro = TI_ACCEL;
                 double dloga_hydro = get_timestep_hydro_dloga(i, times->Ti_Current, atime, hubble, &titype_hydro);
                 inttime_t dti_hydro = convert_timestep_to_ti(dloga_hydro, i, dti_max, times->Ti_Current, titype_hydro);
-                message(1, "Diagnostics: dloga_hydro=%g, dti_hydro=%x, ti_current=%x\n", dloga_hydro, dti_hydro, times->Ti_Current);
+                message(1, "Diagnostics: dloga_hydro=%g, dti_hydro=%d, ti_current=%d\n", dloga_hydro, dti_hydro, times->Ti_Current);
                 
                 if(dti_hydro < dti) {
                     dti = dti_hydro;
@@ -779,7 +779,7 @@ find_timesteps(const ActiveParticles * act, DriftKickTimes * times, const double
             }
             if(dti <= 1 || dti > (inttime_t) TIMEBASE) {
                 message(1, "****** Bad timestep inside find_timesteps **********\n");
-                message(1, "Diagnostics: dloga_gravity=%g, dti=%x, atime=%g, hubble=%g, Ti_Current=%x\n", dloga_gravity, dti, atime, hubble, times->Ti_Current);
+                message(1, "Diagnostics: dloga_gravity=%g, dti=%d, atime=%g, hubble=%g, Ti_Current=%d\n", dloga_gravity, dti, atime, hubble, times->Ti_Current);
                 print_bad_timebin(dloga_gravity, dti, i, dti_max, titype);
             }
             /* Type of shortest timestep criterion. Note that gravity is always TI_ACCEL.*/
