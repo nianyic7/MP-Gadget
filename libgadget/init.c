@@ -72,7 +72,16 @@ void init_timeline(Cosmology * CP, int RestartSnapNum, double TimeMax, const str
         /* If TimeInit is not in a sensible place on the integer timeline
          * (can happen if the outputs changed since it was written)
          * start the integer timeline anew from TimeInit */
-        inttime_t ti_init = ti_from_loga(log(header->TimeSnapshot)) % TIMEBASE;
+        inttime_t ti_init;
+        if (CP->ComovingIntegrationOn) {
+            ti_init = ti_from_loga(log(header->TimeSnapshot)) % TIMEBASE;
+        }
+        else {
+            ti_init = ti_from_loga(header->TimeSnapshot) % TIMEBASE;
+        }
+        
+        message(1,"****** Init Timeline check: header->TimeIC=%g, ti_init = %x \n",header->TimeIC, ti_init);
+        
         if(round_down_power_of_two(ti_init) != ti_init) {
             message(0,"Resetting integer timeline (as %x != %x) to current snapshot\n",ti_init, round_down_power_of_two(ti_init));
             setup_sync_points(CP, header->TimeSnapshot, TimeMax, header->TimeSnapshot, SnapshotWithFOF);
@@ -120,9 +129,13 @@ inttime_t init(int RestartSnapNum, const char * OutputDir, struct header_data * 
 
     gravshort_set_softenings(MeanSeparation[1]);
     fof_init(MeanSeparation[1]);
-
-    inttime_t Ti_Current = init_timebins(header->TimeSnapshot);
-
+    inttime_t Ti_Current;
+    if (CP->ComovingIntegrationOn) {
+         Ti_Current = init_timebins(header->TimeSnapshot);
+    }
+    else {
+        Ti_Current = init_timebins(exp(header->TimeSnapshot));
+    }
     #pragma omp parallel for
     for(i = 0; i < PartManager->NumPart; i++)	/* initialize sph_properties */
     {

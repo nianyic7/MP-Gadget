@@ -201,6 +201,9 @@ find_global_timestep(DriftKickTimes * times, const inttime_t dti_max, const doub
             if(dti < dti_min)
                 dti_min = dti;
             if(dti <= 1 || dti > (inttime_t) TIMEBASE)
+                message(0, "****** Bad timestep inside find_global_timestep **********\n");
+                message(1, "****** Bad timestep inside find_global_timestep **********\n");
+                message(1, "Diagnostics: dloga=%g, dloga_hydro=%g, atime=%g, hubble=%g, Ti_Current=%g\n", dloga, dloga_hydro, atime, hubble, times->Ti_Current);
                 print_bad_timebin(dloga, dti, i, dti_max, titype);
         }
         MPI_Allreduce(MPI_IN_PLACE, &dti_min, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
@@ -767,13 +770,18 @@ find_timesteps(const ActiveParticles * act, DriftKickTimes * times, const double
                 enum TimeStepType titype_hydro = TI_ACCEL;
                 double dloga_hydro = get_timestep_hydro_dloga(i, times->Ti_Current, atime, hubble, &titype_hydro);
                 inttime_t dti_hydro = convert_timestep_to_ti(dloga_hydro, i, dti_max, times->Ti_Current, titype_hydro);
+                message(1, "Diagnostics: dloga_hydro=%g, dti_hydro=%x, ti_current=%x\n", dloga_hydro, dti_hydro, times->Ti_Current);
+                
                 if(dti_hydro < dti) {
                     dti = dti_hydro;
                     titype = titype_hydro;
                 }
             }
-            if(dti <= 1 || dti > (inttime_t) TIMEBASE)
+            if(dti <= 1 || dti > (inttime_t) TIMEBASE) {
+                message(1, "****** Bad timestep inside find_timesteps **********\n");
+                message(1, "Diagnostics: dloga_gravity=%g, dti=%x, atime=%g, hubble=%g, Ti_Current=%x\n", dloga_gravity, dti, atime, hubble, times->Ti_Current);
                 print_bad_timebin(dloga_gravity, dti, i, dti_max, titype);
+            }
             /* Type of shortest timestep criterion. Note that gravity is always TI_ACCEL.*/
             if(titype == TI_ACCEL)
                 ntiaccel++;
