@@ -25,10 +25,12 @@ void real_drift_particle(struct particle_data * pp, struct slots_manager_type * 
     if(pp->IsGarbage || pp->Swallowed) {
         /* Keep the random shift updated so the
          * physical position of swallowed particles remains unchanged.*/
-        for(j = 0; j < 3; j++) {
-            pp->Pos[j] += random_shift[j];
-            while(pp->Pos[j] > BoxSize) pp->Pos[j] -= BoxSize;
-            while(pp->Pos[j] <= 0) pp->Pos[j] += BoxSize;
+        if (!NonPeriodic) {
+            for(j = 0; j < 3; j++) {
+                pp->Pos[j] += random_shift[j];
+                while(pp->Pos[j] > BoxSize) pp->Pos[j] -= BoxSize;
+                while(pp->Pos[j] <= 0) pp->Pos[j] += BoxSize;
+            }
         }
         /* Swallowed particles still need a peano key.*/
         if(pp->Swallowed)
@@ -80,14 +82,20 @@ void real_drift_particle(struct particle_data * pp, struct slots_manager_type * 
         if(pp->Hsml > Maxhsml)
             pp->Hsml = Maxhsml;
     }
+    if (! NonPeriodic) {
+        for(j = 0; j < 3; j++) {
+            pp->Pos[j] += pp->Vel[j] * ddrift + random_shift[j];
+        }
 
-    for(j = 0; j < 3; j++) {
-        pp->Pos[j] += pp->Vel[j] * ddrift + random_shift[j];
+        for(j = 0; j < 3; j ++) {
+            while(pp->Pos[j] > BoxSize) pp->Pos[j] -= BoxSize;
+            while(pp->Pos[j] <= 0) pp->Pos[j] += BoxSize;
+        }
     }
-
-    for(j = 0; j < 3; j ++) {
-        while(pp->Pos[j] > BoxSize) pp->Pos[j] -= BoxSize;
-        while(pp->Pos[j] <= 0) pp->Pos[j] += BoxSize;
+    else {
+        for(j = 0; j < 3; j++) {
+            pp->Pos[j] += pp->Vel[j] * ddrift;
+        }
     }
     /* avoid recomputing them during layout and force tree build.*/
     pp->Key = PEANO(pp->Pos, BoxSize);

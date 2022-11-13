@@ -87,7 +87,11 @@ gravpm_set_lbox_nonperiodic(void) {
         GravPM.Xmin[i] = Xmin[i];
         GravPM.Xmax[i] = Xmax[i];
     }
-
+    
+    message(0, "***** Inside gravpm_set_lbox_nonperiodic ****\n");
+    message(0, "***** Xmin=(%g, %g, %g)  **** \n", Xmin[0], Xmin[1], Xmin[2]);
+    message(0, "***** Xmax=(%g, %g, %g)  **** \n", Xmax[0], Xmax[1], Xmax[2]);
+    message(0, "***** Box=%g  **** \n", box);
     return box;
 }
 

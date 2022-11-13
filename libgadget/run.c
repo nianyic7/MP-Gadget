@@ -320,11 +320,11 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
     if (All.CP.NonPeriodic) {
         PartManager->BoxSize = gravpm_set_lbox_nonperiodic();
         PartManager->NonPeriodic = 1;
-        gravpm_init_periodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal, All.CP.NonPeriodic);
+        gravpm_init_nonperiodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal, All.CP.NonPeriodic);
     }
     else {
         PartManager->NonPeriodic = 0;
-        gravpm_init_nonperiodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal, All.CP.NonPeriodic);
+        gravpm_init_periodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal, All.CP.NonPeriodic);
     }
     /*define excursion set PetaPM structs*/
     /*because we need to FFT 3 grids, and we can't separate sets of regions, we need 3 PetaPM structs */
@@ -486,6 +486,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             /*Predicted SPH data.*/
             struct sph_pred_data sph_predicted = {0};
             if(All.DensityOn)
+                message(0,"**** Density ****\n");
                 density(&Act, 1, DensityIndependentSphOn(), All.BlackHoleOn, times, &All.CP, &sph_predicted, GradRho_mag, &gasTree);  /* computes density, and pressure */
 
             /* adds hydrodynamical accelerations and computes du/dt  */
@@ -499,6 +500,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
                  * he has never encountered a simulation where this matters in practice, probably because
                  * it would only be important in very dissipative environments where the SPH noise is fairly large
                  * and there is no opportunity for errors to build up.*/
+                message(0,"**** Hydro Force ****\n");
                 hydro_force(&Act, afac, &sph_predicted, times, &All.CP, &gasTree);
             }
             /* Scratch data cannot be used checkpoint because FOF does an exchange.*/
@@ -533,7 +535,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             ForceTree Tree = {0};
             force_tree_full(&Tree, ddecomp, HybridNuTracer, All.OutputDir);
             /* Non-ComovingIntegration Note: Doesn't seem to matter is we use log(a) or 1 in here*/
-
+            message(0,"**** PM Force ****\n");
             gravpm_force(&pm, &Tree, &All.CP, atime, units.UnitLength_in_cm, All.OutputDir, header->TimeIC, All.FastParticleType);
 
 
@@ -567,6 +569,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
                     /* Do a short range pairwise only step if desired*/
                     const double rho0 = All.CP.Omega0 * 3 * All.CP.Hubble * All.CP.Hubble / (8 * M_PI * All.CP.GravInternal);
                     force_tree_full(&Tree, ddecomp, HybridNuTracer, All.OutputDir);
+                    message(0,"**** grav_short_tree ****\n");
                     grav_short_tree(&Act, &pm, &Tree, NULL, rho0, HybridNuTracer, All.FastParticleType, times.Ti_Current);
             }
         }
@@ -576,6 +579,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
              * Need a scale factor for entropy and velocity limiters.
              * For hierarchical gravity the short-range kick is done above.
              * Synchronises TiKick and TiDrift for the active particles. */
+            message(0,"**** Half Kick ****\n");
             apply_half_kick(&Act, &All.CP, &times, afac);
         }
 
@@ -624,10 +628,11 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
         {
             /* Do this before sfr and bh so the gas hsml always contains DesNumNgb neighbours.*/
             if(All.MetalReturnOn) {
+                
                 double AvgGasMass = All.CP.OmegaBaryon * 3 * All.CP.Hubble * All.CP.Hubble / (8 * M_PI * All.CP.GravInternal) * pow(PartManager->BoxSize, 3) / header->NTotalInit[0];
                 metal_return(&Act, ddecomp, &All.CP, afac, AvgGasMass);
             }
-
+            message(0, "**** Passed Metal Return ****\n");
             /* this will find new black hole seed halos.
              * Note: the FOF code does not know about garbage particles,
              * so ensure we do not have garbage present when we call this.
@@ -657,6 +662,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
                 }
                 fof_finish(&fof);
             }
+            message(0, "**** Passed BH Seeding **** \n");
 
             /* Note that the tree here may be freed, if we are not a gravity-active timestep,
              * or if we are a PM step.*/
@@ -669,11 +675,14 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             /* Black hole accretion and feedback */
             if(All.BlackHoleOn)
                 blackhole(&Act, afac, &All.CP, &Tree, ddecomp, &times, units, fds.FdBlackHoles, fds.FdBlackholeDetails);
+            message(0, "**** Passed Black Hole stuff **** \n");
 
             /**** radiative cooling and star formation *****/
             if(All.CoolingOn)
                 cooling_and_starformation(&Act, afac, &times, get_dloga_for_bin(times.mintimebin, times.Ti_Current), &Tree, GravAccel, ddecomp, &All.CP, GradRho_mag, fds.FdSfr);
         }
+        
+        message(0, "**** Passed Gas stuff **** \n");
         /* We don't need this timestep's tree anymore.*/
         force_tree_free(&Tree);
 
@@ -681,7 +690,9 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
          * We only attempt to output on sync points. This is the only chance where all variables are
          * synchronized in a consistent state in a K(KDDK)^mK scheme.
          */
-
+        if (All.CP.ComovingIntegrationOn) {
+            WriteFOF = 0;
+        }
         if(is_PM) { /* the if here is unnecessary but to signify checkpointing occurs only at PM steps. */
             WriteSnapshot |= action->write_snapshot;
             WriteFOF |= action->write_fof;
@@ -696,16 +707,16 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
                 Act.NumActiveParticle = PartManager->NumPart;
         }
         FOFGroups fof = {0};
-        if(WriteFOF) {
+        if (WriteFOF) {
             /* Compute FOF and assign GrNr so it can be written in checkpoint.*/
             fof = fof_fof(ddecomp, 1, MPI_COMM_WORLD);
         }
-
+        message(0, "**** Passed FOF ****");
         /* WriteFOF just reminds the checkpoint code to save GroupID*/
         /* Non-ComovingIntegration Note: use atime=log(a) here to write snapshots*/
         if(WriteSnapshot)
             write_checkpoint(SnapshotFileCount, WriteFOF, All.MetalReturnOn, atime, &All.CP, All.OutputDir, All.OutputDebugFields);
-
+        message(0, "**** Saved checkpoint ****");
         /* Save FOF tables after checkpoint so that if there is a FOF save bug we have particle tables available to debug it*/
         if(WriteFOF) {
             fof_save_groups(&fof, All.OutputDir, All.FOFFileBase, SnapshotFileCount, &All.CP, atime, header->MassTable, All.MetalReturnOn, All.BlackHoleOn, MPI_COMM_WORLD);
@@ -716,7 +727,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
         check_kick_drift_times(PartManager, times.Ti_Current);
 #endif
         write_cpu_log(NumCurrentTiStep, atime, fds.FdCPU, Clocks.ElapsedTime);    /* produce some CPU usage info */
-
+        
         report_memory_usage("RUN");
 
         if(!next_sync || stop) {
@@ -738,6 +749,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             /* Update velocity and ti_kick to the new step, with the newly computed step size. Unsyncs ti_kick and ti_drift.
              * Both hydro and gravity are kicked.*/
             apply_half_kick(&Act, &All.CP, &times, afac);
+            message(0, "**** Second Half Kick ****\n");
         } else {
             /* This finds the gravity timesteps, computes the gravitational forces
              * and kicks the particles on the gravitational timeline.
@@ -766,9 +778,11 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             myfree(GradRho_mag);
             GradRho_mag = NULL;
         }
+        message(0, "**** Freed Hydro ****\n");
 
         /* Set ti_kick in the time structure*/
         update_kick_times(&times);
+        message(0, "**** Updated Kick Times ****\n");
 
         if(is_PM) {
             apply_PM_half_kick(&All.CP, &times);
@@ -778,6 +792,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
         free_active_particles(&Act);
 
         NumCurrentTiStep++;
+        message(0, "**** Finished One Step ****\n");
     }
 
     close_outputfiles(&fds);

@@ -695,10 +695,17 @@ static void GTPosition(int i, double * out, void * baseptr, void * smanptr, cons
     /* Remove the particle offset before saving*/
     struct particle_data * part = (struct particle_data *) baseptr;
     int d;
-    for(d = 0; d < 3; d ++) {
-        out[d] = part[i].Pos[d] - PartManager->CurrentParticleOffset[d];
-        while(out[d] > PartManager->BoxSize) out[d] -= PartManager->BoxSize;
-        while(out[d] <= 0) out[d] += PartManager->BoxSize;
+    if PartManager->NonPeriodic {
+        for(d = 0; d < 3; d ++) {
+            out[d] = part[i].Pos[d];
+        }
+    }
+    else {
+        for(d = 0; d < 3; d ++) {
+            out[d] = part[i].Pos[d] - PartManager->CurrentParticleOffset[d];
+            while(out[d] > PartManager->BoxSize) out[d] -= PartManager->BoxSize;
+            while(out[d] <= 0) out[d] += PartManager->BoxSize;
+        }
     }
 }
 
