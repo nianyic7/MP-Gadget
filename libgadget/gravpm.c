@@ -55,9 +55,10 @@ static struct gravpm_params
 double  
 gravpm_set_lbox_nonperiodic(void) {
     int NumPart = PartManager->NumPart;
+    double box = PartManager->BoxSize;
     int k;
     int i;
-    double box;
+
     double Xmin[3] = {1.0e30, 1.0e30, 1.0e30};
     double Xmax[3] = {-1.0e30, -1.0e30, -1.0e30};
     
@@ -74,11 +75,11 @@ gravpm_set_lbox_nonperiodic(void) {
     MPI_Allreduce(MPI_IN_PLACE, &Xmin, 3, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
     MPI_Allreduce(MPI_IN_PLACE, &Xmax, 3, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
-    box = Xmax[0] - Xmin[0];
-    if ((Xmax[1] - Xmin[1]) > box)
-        box = Xmax[1] - Xmin[1];
-    if ((Xmax[2] - Xmin[2]) > box)
-        box = Xmax[2] - Xmin[2];
+    for(i = 0; i < NumPart; i ++) {
+        if ((Xmax[i] - Xmin[i]) * 1.1 > box)
+            box = (Xmax[i] - Xmin[i]) * 1.1;
+    }
+
 
     MPI_Barrier(MPI_COMM_WORLD);
     /* redefine xmax by boxsize */
@@ -164,11 +165,13 @@ gravpm_force(PetaPM * pm, ForceTree * tree, Cosmology * CP, double Time, double 
      * */
     petapm_force(pm, _prepare, &global_functions, functions, &pstruct, tree);
     powerspectrum_sum(pm->ps);
-    /*Now save the power spectrum*/
-    powerspectrum_save(pm->ps, PowerOutputDir, "powerspectrum", Time, GrowthFactor(CP, Time, 1.0));
-    /* Save the neutrino power if it is allocated*/
-    if(pm->ps->logknu)
-        powerspectrum_nu_save(pm->ps, PowerOutputDir, "powerspectrum-nu", Time);
+    if (CP->ComovingIntegrationOn) {
+        /*Now save the power spectrum*/
+        powerspectrum_save(pm->ps, PowerOutputDir, "powerspectrum", Time, GrowthFactor(CP, Time, 1.0));
+        /* Save the neutrino power if it is allocated*/
+        if(pm->ps->logknu)
+            powerspectrum_nu_save(pm->ps, PowerOutputDir, "powerspectrum-nu", Time);
+    }
     /*We are done with the power spectrum, free it*/
     powerspectrum_free(pm->ps);
     walltime_measure("/LongRange");

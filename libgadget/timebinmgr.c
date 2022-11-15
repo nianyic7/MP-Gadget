@@ -295,7 +295,10 @@ SyncPoint *
 find_next_sync_point(inttime_t ti)
 {
     int i;
+    message(0, "**** Inside find_next_sync_point ***\n");
+    message(0, "**** ti_curr = %d ***\n", ti);
     for(i = 0; i < NSyncPoints; i ++) {
+        message(0, "**** SyncPoints[%d].ti = %d ***\n", i, SyncPoints[i].ti);
         if(SyncPoints[i].ti > ti) {
             return &SyncPoints[i];
         }

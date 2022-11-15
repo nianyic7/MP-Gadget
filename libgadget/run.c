@@ -318,7 +318,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
 
     PetaPM pm = {0};
     if (All.CP.NonPeriodic) {
-        PartManager->BoxSize = gravpm_set_lbox_nonperiodic();
+        // PartManager->BoxSize = gravpm_set_lbox_nonperiodic();
         PartManager->NonPeriodic = 1;
         gravpm_init_nonperiodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal, All.CP.NonPeriodic);
     }
@@ -397,7 +397,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             afac = 1.;
         }
         
-        PartManager->BoxSize = gravpm_set_lbox_nonperiodic();
+        // PartManager->BoxSize = gravpm_set_lbox_nonperiodic();
         
         /* Compute the list of particles that cross a lightcone and write it to disc.*/
         if(All.LightconeOn)
@@ -410,6 +410,8 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
 
         next_sync = find_next_sync_point(times.Ti_Current);
         planned_sync = find_current_sync_point(times.Ti_Current);
+        
+        message(0, "**** next_sync = %g, planned_sync = %g***** \n", next_sync, planned_sync);
 
         HCIAction action[1];
 
@@ -537,7 +539,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             /* Non-ComovingIntegration Note: Doesn't seem to matter is we use log(a) or 1 in here*/
             message(0,"**** PM Force ****\n");
             gravpm_force(&pm, &Tree, &All.CP, atime, units.UnitLength_in_cm, All.OutputDir, header->TimeIC, All.FastParticleType);
-
+            message(0,"**** Passed PM Force ****\n");
 
             /* compute and output energy statistics if desired. */
             if(fds.FdEnergy)
@@ -573,6 +575,8 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
                     grav_short_tree(&Act, &pm, &Tree, NULL, rho0, HybridNuTracer, All.FastParticleType, times.Ti_Current);
             }
         }
+        
+        message(0,"**** Passed totgravactive ****\n");
 
         if(!All.HierarchicalGravity){
             /* Do both short-range gravity and hydro kicks.
@@ -690,9 +694,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
          * We only attempt to output on sync points. This is the only chance where all variables are
          * synchronized in a consistent state in a K(KDDK)^mK scheme.
          */
-        if (All.CP.ComovingIntegrationOn) {
-            WriteFOF = 0;
-        }
+
         if(is_PM) { /* the if here is unnecessary but to signify checkpointing occurs only at PM steps. */
             WriteSnapshot |= action->write_snapshot;
             WriteFOF |= action->write_fof;
@@ -707,28 +709,35 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
                 Act.NumActiveParticle = PartManager->NumPart;
         }
         FOFGroups fof = {0};
+        
+        if (All.CP.ComovingIntegrationOn) {
+            WriteFOF = 0;
+        }
         if (WriteFOF) {
             /* Compute FOF and assign GrNr so it can be written in checkpoint.*/
             fof = fof_fof(ddecomp, 1, MPI_COMM_WORLD);
         }
-        message(0, "**** Passed FOF ****");
+        message(0, "**** Passed calc FOF **** \n");
         /* WriteFOF just reminds the checkpoint code to save GroupID*/
         /* Non-ComovingIntegration Note: use atime=log(a) here to write snapshots*/
         if(WriteSnapshot)
             write_checkpoint(SnapshotFileCount, WriteFOF, All.MetalReturnOn, atime, &All.CP, All.OutputDir, All.OutputDebugFields);
-        message(0, "**** Saved checkpoint ****");
+        message(0, "**** Saved checkpoint **** \n");
         /* Save FOF tables after checkpoint so that if there is a FOF save bug we have particle tables available to debug it*/
         if(WriteFOF) {
             fof_save_groups(&fof, All.OutputDir, All.FOFFileBase, SnapshotFileCount, &All.CP, atime, header->MassTable, All.MetalReturnOn, All.BlackHoleOn, MPI_COMM_WORLD);
             fof_finish(&fof);
         }
+        message(0, "**** Passed save FOF **** \n");
 
 #ifdef DEBUG
         check_kick_drift_times(PartManager, times.Ti_Current);
 #endif
         write_cpu_log(NumCurrentTiStep, atime, fds.FdCPU, Clocks.ElapsedTime);    /* produce some CPU usage info */
+        message(0, "**** Passed cpu_log **** \n");
         
         report_memory_usage("RUN");
+        message(0, "**** Passed report_memory_usage **** \n");
 
         if(!next_sync || stop) {
             /* out of sync points, or a requested stop, the run has finally finished! Yay.*/
@@ -736,6 +745,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
                 message(0, "Stopping: not enough time for another PM step before TimeLimitCPU is reached.\n");
             break;
         }
+        message(0, "**** Passed  HCI_TIMEOUT check **** \n");
 
         /* more steps to go. */
 
@@ -744,6 +754,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
          * and advance the PM timestep.*/
         int badtimestep=0;
         if(!All.HierarchicalGravity) {
+            message(0, "**** Inside Non-HierarchicalGravity **** \n");
             const double asmth = pm.Asmth * PartManager->BoxSize / pm.Nmesh;
             badtimestep = find_timesteps(&Act, &times, afac, All.FastParticleType, &All.CP, asmth, NumCurrentTiStep == 0);
             /* Update velocity and ti_kick to the new step, with the newly computed step size. Unsyncs ti_kick and ti_drift.
@@ -765,6 +776,8 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
                 apply_hydro_half_kick(&Act, &All.CP, &times, afac);
             }
         }
+        
+        
         if(badtimestep) {
             message(0, "Bad timestep spotted: terminating and saving snapshot.\n");
             dump_snapshot("TIMESTEP-DUMP", atime, &All.CP, All.OutputDir);

@@ -134,7 +134,7 @@ inttime_t init(int RestartSnapNum, const char * OutputDir, struct header_data * 
          Ti_Current = init_timebins(header->TimeSnapshot);
     }
     else {
-        Ti_Current = init_timebins(exp(header->TimeSnapshot));
+        Ti_Current = init_timebins(header->TimeSnapshot);
     }
     #pragma omp parallel for
     for(i = 0; i < PartManager->NumPart; i++)	/* initialize sph_properties */
