@@ -318,7 +318,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
 
     PetaPM pm = {0};
     if (All.CP.NonPeriodic) {
-        // PartManager->BoxSize = gravpm_set_lbox_nonperiodic();
+        PartManager->BoxSize = gravpm_set_lbox_nonperiodic();
         PartManager->NonPeriodic = 1;
         gravpm_init_nonperiodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal, All.CP.NonPeriodic);
     }
@@ -397,7 +397,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             afac = 1.;
         }
         
-        // PartManager->BoxSize = gravpm_set_lbox_nonperiodic();
+        PartManager->BoxSize = gravpm_set_lbox_nonperiodic();
         
         /* Compute the list of particles that cross a lightcone and write it to disc.*/
         if(All.LightconeOn)

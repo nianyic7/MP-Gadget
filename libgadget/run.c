@@ -318,7 +318,8 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
 
     PetaPM pm = {0};
     if (All.CP.NonPeriodic) {
-        // PartManager->BoxSize = gravpm_set_lbox_nonperiodic();
+        set_lbox_nonperiodic(PartManager);
+        message(0, "***** set boxsize %g *****", PartManager->BoxSize);
         PartManager->NonPeriodic = 1;
         gravpm_init_nonperiodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal, All.CP.NonPeriodic);
     }
@@ -397,8 +398,6 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             afac = 1.;
         }
         
-        // PartManager->BoxSize = gravpm_set_lbox_nonperiodic();
-        
         /* Compute the list of particles that cross a lightcone and write it to disc.*/
         if(All.LightconeOn)
             lightcone_compute(atime, PartManager->BoxSize, &All.CP, Ti_Last, Ti_Next);
@@ -430,7 +429,14 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
 
         double rel_random_shift[3] = {0};
         if(NumCurrentTiStep > 0 && is_PM  && All.RandomParticleOffset > 0) {
-            update_random_offset(PartManager, rel_random_shift, All.RandomParticleOffset);
+            /* For NonPeriodic bounary, particles are offset by min(Pos[i]) to prevent oob issue */
+            if (All.CP.NonPeriodic) {
+                set_lbox_nonperiodic(PartManager);
+                update_offset(PartManager, rel_random_shift);
+            }
+            else {
+                update_random_offset(PartManager, rel_random_shift, All.RandomParticleOffset);
+            }
         }
 
         int extradomain = is_timebin_active(times.mintimebin + All.MaxDomainTimeBinDepth, times.Ti_Current);

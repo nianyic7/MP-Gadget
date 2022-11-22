@@ -697,7 +697,7 @@ static void GTPosition(int i, double * out, void * baseptr, void * smanptr, cons
     int d;
     if (PartManager->NonPeriodic) {
         for(d = 0; d < 3; d ++) {
-            out[d] = part[i].Pos[d];
+            out[d] = part[i].Pos[d] - PartManager->CurrentParticleOffset[d];
         }
     }
     else {

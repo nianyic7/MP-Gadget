@@ -72,10 +72,11 @@ gravpm_set_lbox_nonperiodic(void) {
         }
     }
     
+    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Allreduce(MPI_IN_PLACE, &Xmin, 3, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
     MPI_Allreduce(MPI_IN_PLACE, &Xmax, 3, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
-    for(i = 0; i < NumPart; i ++) {
+    for(i = 0; i < 3; i ++) {
         if ((Xmax[i] - Xmin[i]) * 1.1 > box)
             box = (Xmax[i] - Xmin[i]) * 1.1;
     }

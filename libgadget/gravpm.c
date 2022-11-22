@@ -72,10 +72,11 @@ gravpm_set_lbox_nonperiodic(void) {
         }
     }
     
+    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Allreduce(MPI_IN_PLACE, &Xmin, 3, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
     MPI_Allreduce(MPI_IN_PLACE, &Xmax, 3, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
-    for(i = 0; i < NumPart; i ++) {
+    for(i = 0; i < 3; i ++) {
         if ((Xmax[i] - Xmin[i]) * 1.1 > box)
             box = (Xmax[i] - Xmin[i]) * 1.1;
     }
@@ -101,17 +102,12 @@ void
 gravpm_init_nonperiodic(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, int NonPeriodic) {
 /* does not matter if we use any boxsize in initialization because it's only used to inform pm->BoxSize
   we will be okay if we substitute pm->BoxSize to GravPM->BoxSize properly */
-  double Xmin[3];
-  for(int k = 0; k < 3; k ++) {
-      Xmin[k] = GravPM.Xmin[k];
-  }
   petapm_init(pm, 2*BoxSize, Xmin, Asmth, 2*Nmesh, G, NonPeriodic, MPI_COMM_WORLD);
 }
 
 
 void
 gravpm_init_periodic(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, int NonPeriodic) {
-    double Xmin[3] = {0., 0., 0.};
     petapm_init(pm, BoxSize, Xmin, Asmth, Nmesh, G, NonPeriodic, MPI_COMM_WORLD);
 }
 

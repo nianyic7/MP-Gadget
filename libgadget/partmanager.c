@@ -66,3 +66,66 @@ update_random_offset(struct part_manager_type * PartManager, double * rel_random
             endrun(44, "Random shift %d is %g != %g on task 0!\n", i, test_random_shift[i], PartManager->CurrentParticleOffset[i]);
 #endif
 }
+
+    
+void
+update_offset(struct part_manager_type * PartManager, double * rel_random_shift)
+{
+    int i;
+    double rr;
+    for (i = 0; i < 3; i++) {
+        rr = PartManager->Xmin[i]; 
+        /* Subtract the old random shift first.*/
+        rel_random_shift[i] = rr - PartManager->CurrentParticleOffset[i];
+        PartManager->CurrentParticleOffset[i] = rr;
+    }
+    message(0, "Internal particle offset is now %g %g %g\n", PartManager->CurrentParticleOffset[0], PartManager->CurrentParticleOffset[1], PartManager->CurrentParticleOffset[2]);
+}
+
+/* Calculate the box size based on particle positions*/
+void  
+set_lbox_nonperiodic(struct part_manager_type * PartManager) {
+    int NumPart = PartManager->NumPart;
+    double box = PartManager->BoxSize;
+    int k;
+    int i;
+
+    double Xmin[3] = {1.0e30, 1.0e30, 1.0e30};
+    double Xmax[3] = {-1.0e30, -1.0e30, -1.0e30};
+    
+    #pragma omp parallel for
+    for(i = 0; i < NumPart; i ++) {
+        for(k = 0; k < 3; k ++) {
+            if(Xmin[k] > P[i].Pos[k])
+            Xmin[k] = P[i].Pos[k];
+            if(Xmax[k] < P[i].Pos[k])
+            Xmax[k] = P[i].Pos[k];
+        }
+    }
+    
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, &Xmin, 3, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, &Xmax, 3, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+
+    for(i = 0; i < 3; i ++) {
+        if ((Xmax[i] - Xmin[i]) * 1.1 > box)
+            box = (Xmax[i] - Xmin[i]) * 1.1;
+    }
+
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    /* redefine xmax by boxsize */
+    for(i = 0; i < 3; i++) {
+        Xmax[i] = Xmin[i] + box;
+        PartManager->Xmin[i] = Xmin[i];
+        PartManager->Xmax[i] = Xmax[i];
+    }
+    PartManager->BoxSize = box;
+    
+    message(0, "***** Inside PartManager set_lbox_nonperiodic ****\n");
+    message(0, "***** Xmin=(%g, %g, %g)  **** \n", Xmin[0], Xmin[1], Xmin[2]);
+    message(0, "***** Xmax=(%g, %g, %g)  **** \n", Xmax[0], Xmax[1], Xmax[2]);
+    message(0, "***** Box=%g  **** \n", box);
+}
+
+

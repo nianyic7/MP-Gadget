@@ -100,7 +100,7 @@ petapm_module_init(int Nthreads)
 }
 
 void
-petapm_init(PetaPM * pm, double BoxSize, double Xmin[3], double Asmth, int Nmesh, double G, int NonPeriodic, MPI_Comm comm)
+petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, int NonPeriodic, MPI_Comm comm)
 {
     /* define the global long / short range force cut */
     pm->BoxSize = BoxSize;
@@ -109,10 +109,10 @@ petapm_init(PetaPM * pm, double BoxSize, double Xmin[3], double Asmth, int Nmesh
     pm->G = G;
     pm->CellSize = BoxSize / Nmesh;
     pm->comm = comm;
-    pm->Xmin[0] = Xmin[0];
-    pm->Xmin[1] = Xmin[1];
-    pm->Xmin[2] = Xmin[2];
     pm->NonPeriodic = NonPeriodic;
+    
+    message(0, "**** inside petapm init , BoxSize=%g,  Nmesh=%d, CellSize=%g*****", 
+            BoxSize, pm->Nmesh, pm->CellSize);    
 
     ptrdiff_t n[3] = {Nmesh, Nmesh, Nmesh};
     ptrdiff_t np[2];
@@ -982,13 +982,13 @@ pm_iterate_one(PetaPM * pm,
     for(k = 0; k < 3; k++) {
         /* take into account the position offset for non-periodic cases*/
         /* Xmin = 0 for the periodic case */
-        double tmp = (Pos[k] - pm->Xmin[k]) / pm->CellSize;
+        double tmp = Pos[k]  / pm->CellSize;
         iCell[k] = floor(tmp);
         Res[k] = tmp - iCell[k];
         iCell[k] -= region->offset[k];
         /* seriously?! particles are supposed to be contained in cells */
         if(iCell[k] >= region->size[k] - 1 || iCell[k] < 0) {
-            endrun(1, "particle out of cell better stop %d (k=%d) %g %g %g region: %td %td\n", iCell[k],k,
+            endrun(1, "particle out of cell better stop %d (k=%d) %g %g %g, region: %td %td\n", iCell[k],k,
                 Pos[0], Pos[1], Pos[2],
                 region->offset[k], region->size[k]);
         }
