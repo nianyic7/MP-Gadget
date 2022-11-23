@@ -334,11 +334,10 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
     PetaPM pm_mass = {0};
     PetaPM pm_star = {0};
     PetaPM pm_sfr = {0};
-    double Xmin[3] = {0.,0.,0.};
     if(All.ExcursionSetReionOn){
-        petapm_init(&pm_mass, PartManager->BoxSize, Xmin, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
-        petapm_init(&pm_star, PartManager->BoxSize, Xmin, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
-        petapm_init(&pm_sfr, PartManager->BoxSize, Xmin, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
+        petapm_init(&pm_mass, PartManager->BoxSize, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
+        petapm_init(&pm_star, PartManager->BoxSize, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
+        petapm_init(&pm_sfr, PartManager->BoxSize, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
     }
 
     DomainDecomp ddecomp[1] = {0};

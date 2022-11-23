@@ -114,8 +114,7 @@ int main(int argc, char **argv)
 
   double UnitTime_in_s = All2.units.UnitLength_in_cm / All2.units.UnitVelocity_in_cm_per_s;
   double Grav = GRAVITY / pow(All2.units.UnitLength_in_cm, 3) * All2.units.UnitMass_in_g * pow(UnitTime_in_s, 2);
-  double Xmin[3] = {0., 0., 0.};
-  petapm_init(pm, All2.BoxSize, Xmin, 0, All2.Nmesh, Grav, 0, MPI_COMM_WORLD);
+  petapm_init(pm, All2.BoxSize, 0, All2.Nmesh, Grav, 0, MPI_COMM_WORLD);
 
   /*First compute and write CDM*/
   double mass[6] = {0};

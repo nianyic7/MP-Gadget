@@ -980,8 +980,6 @@ pm_iterate_one(PetaPM * pm,
 
     PetaPMRegion * region = &regions[RegionInd];
     for(k = 0; k < 3; k++) {
-        /* take into account the position offset for non-periodic cases*/
-        /* Xmin = 0 for the periodic case */
         double tmp = Pos[k]  / pm->CellSize;
         iCell[k] = floor(tmp);
         Res[k] = tmp - iCell[k];

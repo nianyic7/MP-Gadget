@@ -766,7 +766,9 @@ static void GTVelocity(int i, float * out, void * baseptr, void * smanptr, const
     } else {
         fac = 1.0;
     }
-
+    if (PartManager->NonPeriodic) {
+        fac = 1.0;
+    }
     int d;
     for(d = 0; d < 3; d ++) {
         out[d] = fac * part[i].Vel[d];
@@ -778,6 +780,9 @@ static void STVelocity(int i, float * out, void * baseptr, void * smanptr, const
     if (IO.UsePeculiarVelocity) {
         fac = params->atime;
     } else {
+        fac = 1.0;
+    }
+    if (PartManager->NonPeriodic) {
         fac = 1.0;
     }
 
