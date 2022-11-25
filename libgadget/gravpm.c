@@ -93,14 +93,32 @@ gravpm_force(PetaPM * pm, ForceTree * tree, Cosmology * CP, double Time, double 
 
     if(CP->HybridNeutrinosOn && particle_nu_fraction(&(CP->ONu.hybnu), Time, 0) == 0.)
         pstruct.active = &hybrid_nu_gravpm_is_active;
+    
 
+/******************* For debugging OOB ***************************/
+    double Xmin[3] = {1.0e30, 1.0e30, 1.0e30};
+    double Xmin[3] = {-1.0e30, -1.0e30, -1.0e30};
     int i;
-    #pragma omp parallel for
-    for(i = 0; i < PartManager->NumPart; i++)
-    {
+    
+    for(i = 0; i < PartManager->NumPart; i++) {
+        for (int k=0; k < 3; k++) {
+            Xmin[k] = (Xmin[k] < P[i].Pos[k]) ? Xmin[k] : P[i].Pos[k];
+            Xmax[k] = (Xmax[k] > P[i].Pos[k]) ? Xmax[k] : P[i].Pos[k];
+        } 
+    }
+    
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, Xmin, 3, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, Xmax, 3, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
+    message(0, "**** check Xmin/Xmax inside gravpm_force \n****");
+    message(0, "***** Xmin=(%g, %g, %g)  **** \n", Xmin[0], Xmin[1], Xmin[2]); 
+    message(0, "***** Xmax=(%g, %g, %g)  **** \n", Xmax[0], Xmax[1], Xmax[2]); 
+/****************************************************/
+
+    for(i = 0; i < PartManager->NumPart; i++) {
         P[i].GravPM[0] = P[i].GravPM[1] = P[i].GravPM[2] = 0;
     }
-
     /* Set up parameters*/
     GravPM.Time = Time;
     GravPM.TimeIC = TimeIC;

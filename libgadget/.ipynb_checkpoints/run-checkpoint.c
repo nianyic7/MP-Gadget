@@ -318,7 +318,11 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
 
     PetaPM pm = {0};
     if (All.CP.NonPeriodic) {
-        PartManager->BoxSize = gravpm_set_lbox_nonperiodic();
+        double rel_random_shift[3] = {0};   
+        set_lbox_nonperiodic(PartManager);
+        //update_offset(PartManager, rel_random_shift);
+        
+        message(0, "***** set boxsize %g *****", PartManager->BoxSize);
         PartManager->NonPeriodic = 1;
         gravpm_init_nonperiodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal, All.CP.NonPeriodic);
     }
@@ -333,11 +337,10 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
     PetaPM pm_mass = {0};
     PetaPM pm_star = {0};
     PetaPM pm_sfr = {0};
-    double Xmin[3] = {0.,0.,0.};
     if(All.ExcursionSetReionOn){
-        petapm_init(&pm_mass, PartManager->BoxSize, Xmin, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
-        petapm_init(&pm_star, PartManager->BoxSize, Xmin, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
-        petapm_init(&pm_sfr, PartManager->BoxSize, Xmin, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
+        petapm_init(&pm_mass, PartManager->BoxSize, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
+        petapm_init(&pm_star, PartManager->BoxSize, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
+        petapm_init(&pm_sfr, PartManager->BoxSize, All.Asmth, All.UVBGdim, All.CP.GravInternal, All.CP.NonPeriodic, MPI_COMM_WORLD);
     }
 
     DomainDecomp ddecomp[1] = {0};
@@ -397,8 +400,6 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             afac = 1.;
         }
         
-        PartManager->BoxSize = gravpm_set_lbox_nonperiodic();
-        
         /* Compute the list of particles that cross a lightcone and write it to disc.*/
         if(All.LightconeOn)
             lightcone_compute(atime, PartManager->BoxSize, &All.CP, Ti_Last, Ti_Next);
@@ -430,7 +431,14 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
 
         double rel_random_shift[3] = {0};
         if(NumCurrentTiStep > 0 && is_PM  && All.RandomParticleOffset > 0) {
-            update_random_offset(PartManager, rel_random_shift, All.RandomParticleOffset);
+            /* For NonPeriodic bounary, particles are offset by min(Pos[i]) to prevent oob issue */
+            if (All.CP.NonPeriodic) {
+                set_lbox_nonperiodic(PartManager);
+                update_offset(PartManager, rel_random_shift);
+            }
+            else {
+                update_random_offset(PartManager, rel_random_shift, All.RandomParticleOffset);
+            }
         }
 
         int extradomain = is_timebin_active(times.mintimebin + All.MaxDomainTimeBinDepth, times.Ti_Current);
@@ -439,6 +447,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
         if(extradomain || is_PM) {
             /* Sync positions of all particles */
             drift_all_particles(Ti_Last, times.Ti_Current, &All.CP, rel_random_shift);
+            message(0, "*** Pass drift_all_particles ***");
             /* full decomposition rebuilds the domain, needs keys.*/
             domain_decompose_full(ddecomp);
         } else {
@@ -538,14 +547,16 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             force_tree_full(&Tree, ddecomp, HybridNuTracer, All.OutputDir);
             /* Non-ComovingIntegration Note: Doesn't seem to matter is we use log(a) or 1 in here*/
             message(0,"**** PM Force ****\n");
-            gravpm_force(&pm, &Tree, &All.CP, atime, units.UnitLength_in_cm, All.OutputDir, header->TimeIC, All.FastParticleType);
-            message(0,"**** Passed PM Force ****\n");
 
+            gravpm_force(&pm, &Tree, &All.CP, atime, units.UnitLength_in_cm, All.OutputDir, header->TimeIC, All.FastParticleType);
+            
+            message(0,"**** Passed PM Force ****\n");
             /* compute and output energy statistics if desired. */
             if(fds.FdEnergy)
                 /* Non-ComovingIntegration Note: need afac here as we are using atime purely for computing
                   physical quantities */
                 energy_statistics(fds.FdEnergy, afac, PartManager);
+
         }
 
         /* Force tree object, reused if HierarchicalGravity is off.*/

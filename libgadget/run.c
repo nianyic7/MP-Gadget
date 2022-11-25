@@ -318,7 +318,10 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
 
     PetaPM pm = {0};
     if (All.CP.NonPeriodic) {
+        double rel_random_shift[3] = {0};   
         set_lbox_nonperiodic(PartManager);
+        //update_offset(PartManager, rel_random_shift);
+        
         message(0, "***** set boxsize %g *****", PartManager->BoxSize);
         PartManager->NonPeriodic = 1;
         gravpm_init_nonperiodic(&pm, PartManager->BoxSize, All.Asmth, All.Nmesh, All.CP.GravInternal, All.CP.NonPeriodic);
@@ -444,6 +447,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
         if(extradomain || is_PM) {
             /* Sync positions of all particles */
             drift_all_particles(Ti_Last, times.Ti_Current, &All.CP, rel_random_shift);
+            message(0, "*** Pass drift_all_particles ***");
             /* full decomposition rebuilds the domain, needs keys.*/
             domain_decompose_full(ddecomp);
         } else {
@@ -543,14 +547,16 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             force_tree_full(&Tree, ddecomp, HybridNuTracer, All.OutputDir);
             /* Non-ComovingIntegration Note: Doesn't seem to matter is we use log(a) or 1 in here*/
             message(0,"**** PM Force ****\n");
-            gravpm_force(&pm, &Tree, &All.CP, atime, units.UnitLength_in_cm, All.OutputDir, header->TimeIC, All.FastParticleType);
-            message(0,"**** Passed PM Force ****\n");
 
+            gravpm_force(&pm, &Tree, &All.CP, atime, units.UnitLength_in_cm, All.OutputDir, header->TimeIC, All.FastParticleType);
+            
+            message(0,"**** Passed PM Force ****\n");
             /* compute and output energy statistics if desired. */
             if(fds.FdEnergy)
                 /* Non-ComovingIntegration Note: need afac here as we are using atime purely for computing
                   physical quantities */
                 energy_statistics(fds.FdEnergy, afac, PartManager);
+
         }
 
         /* Force tree object, reused if HierarchicalGravity is off.*/

@@ -24,10 +24,10 @@ void real_drift_particle(struct particle_data * pp, struct slots_manager_type * 
     int j;
     if(pp->IsGarbage || pp->Swallowed) {
         /* Keep the random shift updated so the
-         * physical position of swallowed particles remains unchanged.*/
-        if (!NonPeriodic) {
-            for(j = 0; j < 3; j++) {
-                pp->Pos[j] += random_shift[j];
+     * physical position of swallowed particles remains unchanged.*/
+        for(j = 0; j < 3; j++) {
+            pp->Pos[j] += random_shift[j];
+            if (!NonPeriodic) {
                 while(pp->Pos[j] > BoxSize) pp->Pos[j] -= BoxSize;
                 while(pp->Pos[j] <= 0) pp->Pos[j] += BoxSize;
             }
@@ -93,8 +93,9 @@ void real_drift_particle(struct particle_data * pp, struct slots_manager_type * 
         }
     }
     else {
+        /* add the non-random shift to keep the particle centered   */
         for(j = 0; j < 3; j++) {
-            pp->Pos[j] += pp->Vel[j] * ddrift;
+            pp->Pos[j] += pp->Vel[j] * ddrift + random_shift[j];
         }
     }
     /* avoid recomputing them during layout and force tree build.*/
@@ -121,5 +122,26 @@ void drift_all_particles(inttime_t ti0, inttime_t ti1, Cosmology * CP, const dou
         PartManager->Base[i].Ti_drift = ti1;
     }
 
+/******************* For debugging OOB ***************************/
+    double Xmin[3] = {1.0e30, 1.0e30, 1.0e30};
+    double Xmin[3] = {-1.0e30, -1.0e30, -1.0e30};
+    int i;
+    
+    for(i = 0; i < PartManager->NumPart; i++) {
+        for (int k=0; k < 3; k++) {
+            Xmin[k] = (Xmin[k] < P[i].Pos[k]) ? Xmin[k] : P[i].Pos[k];
+            Xmax[k] = (Xmax[k] > P[i].Pos[k]) ? Xmax[k] : P[i].Pos[k];
+        } 
+    }
+    
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, Xmin, 3, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, Xmax, 3, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
+    message(0, "**** check Xmin/Xmax inside drift \n****");
+    message(0, "***** Xmin=(%g, %g, %g)  **** \n", Xmin[0], Xmin[1], Xmin[2]); 
+    message(0, "***** Xmax=(%g, %g, %g)  **** \n", Xmax[0], Xmax[1], Xmax[2]); 
+/****************************************************/
+    
     walltime_measure("/Drift/All");
 }

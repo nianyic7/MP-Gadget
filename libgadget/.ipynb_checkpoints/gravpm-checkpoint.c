@@ -47,73 +47,21 @@ static struct gravpm_params
     Cosmology * CP;
     int FastParticleType;
     double UnitLength_in_cm;
-    double Xmax[3],Xmin[3];
 } GravPM;
 
-
-/* Calculate the box size based on particle positions*/
-double  
-gravpm_set_lbox_nonperiodic(void) {
-    int NumPart = PartManager->NumPart;
-    double box = PartManager->BoxSize;
-    int k;
-    int i;
-
-    double Xmin[3] = {1.0e30, 1.0e30, 1.0e30};
-    double Xmax[3] = {-1.0e30, -1.0e30, -1.0e30};
-    
-    #pragma omp parallel for
-    for(i = 0; i < NumPart; i ++) {
-        for(k = 0; k < 3; k ++) {
-            if(Xmin[k] > P[i].Pos[k])
-            Xmin[k] = P[i].Pos[k];
-            if(Xmax[k] < P[i].Pos[k])
-            Xmax[k] = P[i].Pos[k];
-        }
-    }
-    
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Allreduce(MPI_IN_PLACE, &Xmin, 3, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-    MPI_Allreduce(MPI_IN_PLACE, &Xmax, 3, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-
-    for(i = 0; i < 3; i ++) {
-        if ((Xmax[i] - Xmin[i]) * 1.1 > box)
-            box = (Xmax[i] - Xmin[i]) * 1.1;
-    }
-
-
-    MPI_Barrier(MPI_COMM_WORLD);
-    /* redefine xmax by boxsize */
-    for(i = 0; i < 3; i++) {
-        Xmax[i] = Xmin[i] + box;
-        GravPM.Xmin[i] = Xmin[i];
-        GravPM.Xmax[i] = Xmax[i];
-    }
-    
-    message(0, "***** Inside gravpm_set_lbox_nonperiodic ****\n");
-    message(0, "***** Xmin=(%g, %g, %g)  **** \n", Xmin[0], Xmin[1], Xmin[2]);
-    message(0, "***** Xmax=(%g, %g, %g)  **** \n", Xmax[0], Xmax[1], Xmax[2]);
-    message(0, "***** Box=%g  **** \n", box);
-    return box;
-}
 
 
 void
 gravpm_init_nonperiodic(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, int NonPeriodic) {
 /* does not matter if we use any boxsize in initialization because it's only used to inform pm->BoxSize
   we will be okay if we substitute pm->BoxSize to GravPM->BoxSize properly */
-  double Xmin[3];
-  for(int k = 0; k < 3; k ++) {
-      Xmin[k] = GravPM.Xmin[k];
-  }
-  petapm_init(pm, 2*BoxSize, Xmin, Asmth, 2*Nmesh, G, NonPeriodic, MPI_COMM_WORLD);
+  petapm_init(pm, 2*BoxSize, Asmth, 2*Nmesh, G, NonPeriodic, MPI_COMM_WORLD);
 }
 
 
 void
 gravpm_init_periodic(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, int NonPeriodic) {
-    double Xmin[3] = {0., 0., 0.};
-    petapm_init(pm, BoxSize, Xmin, Asmth, Nmesh, G, NonPeriodic, MPI_COMM_WORLD);
+    petapm_init(pm, BoxSize, Asmth, Nmesh, G, NonPeriodic, MPI_COMM_WORLD);
 }
 
 /* Computes the gravitational force on the PM grid
@@ -145,14 +93,32 @@ gravpm_force(PetaPM * pm, ForceTree * tree, Cosmology * CP, double Time, double 
 
     if(CP->HybridNeutrinosOn && particle_nu_fraction(&(CP->ONu.hybnu), Time, 0) == 0.)
         pstruct.active = &hybrid_nu_gravpm_is_active;
+    
 
+/******************* For debugging OOB ***************************/
+    double Xmin[3] = {1.0e30, 1.0e30, 1.0e30};
+    double Xmin[3] = {-1.0e30, -1.0e30, -1.0e30};
     int i;
-    #pragma omp parallel for
-    for(i = 0; i < PartManager->NumPart; i++)
-    {
+    
+    for(i = 0; i < PartManager->NumPart; i++) {
+        for (int k=0; k < 3; k++) {
+            Xmin[k] = (Xmin[k] < P[i].Pos[k]) ? Xmin[k] : P[i].Pos[k];
+            Xmax[k] = (Xmax[k] > P[i].Pos[k]) ? Xmax[k] : P[i].Pos[k];
+        } 
+    }
+    
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, Xmin, 3, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, Xmax, 3, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
+    message(0, "**** check Xmin/Xmax inside gravpm_force \n****");
+    message(0, "***** Xmin=(%g, %g, %g)  **** \n", Xmin[0], Xmin[1], Xmin[2]); 
+    message(0, "***** Xmax=(%g, %g, %g)  **** \n", Xmax[0], Xmax[1], Xmax[2]); 
+/****************************************************/
+
+    for(i = 0; i < PartManager->NumPart; i++) {
         P[i].GravPM[0] = P[i].GravPM[1] = P[i].GravPM[2] = 0;
     }
-
     /* Set up parameters*/
     GravPM.Time = Time;
     GravPM.TimeIC = TimeIC;
