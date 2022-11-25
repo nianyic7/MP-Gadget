@@ -124,8 +124,8 @@ void drift_all_particles(inttime_t ti0, inttime_t ti1, Cosmology * CP, const dou
 
 /******************* For debugging OOB ***************************/
     double Xmin[3] = {1.0e30, 1.0e30, 1.0e30};
-    double Xmin[3] = {-1.0e30, -1.0e30, -1.0e30};
-    int i;
+    double Xmax[3] = {-1.0e30, -1.0e30, -1.0e30};
+
     
     for(i = 0; i < PartManager->NumPart; i++) {
         for (int k=0; k < 3; k++) {

@@ -97,7 +97,7 @@ gravpm_force(PetaPM * pm, ForceTree * tree, Cosmology * CP, double Time, double 
 
 /******************* For debugging OOB ***************************/
     double Xmin[3] = {1.0e30, 1.0e30, 1.0e30};
-    double Xmin[3] = {-1.0e30, -1.0e30, -1.0e30};
+    double Xmax[3] = {-1.0e30, -1.0e30, -1.0e30};
     int i;
     
     for(i = 0; i < PartManager->NumPart; i++) {
