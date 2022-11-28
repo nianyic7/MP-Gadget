@@ -1005,16 +1005,31 @@ void register_io_blocks(struct IOTable * IOTable, int WriteGroupID, int MetalRet
     /* end SF */
 
     /* Black hole */
-    IO_REG_TYPE(StarFormationTime, "f4", 1, 5, IOTable);
-    IO_REG(BlackholeMass,          "f4", 1, 5, IOTable);
-    IO_REG(BlackholeDensity,          "f4", 1, 5, IOTable);
-    IO_REG(BlackholeAccretionRate, "f4", 1, 5, IOTable);
-    IO_REG(BlackholeProgenitors,   "i4", 1, 5, IOTable);
-    IO_REG(BlackholeMinPotPos, "f8", 3, 5, IOTable);
-    IO_REG(BlackholeJumpToMinPot,   "i4", 1, 5, IOTable);
-    IO_REG(BlackholeMtrack,         "f4", 1, 5, IOTable);
-    IO_REG_NONFATAL(BlackholeMseed,         "f4", 1, 5, IOTable);
-    IO_REG_NONFATAL(BlackholeKineticFdbkEnergy, "f4", 1, 5, IOTable);
+    if(ComovingIntegrationOn) {
+        IO_REG_TYPE(StarFormationTime, "f4", 1, 5, IOTable);
+        IO_REG(BlackholeMass,          "f4", 1, 5, IOTable);
+        IO_REG(BlackholeDensity,          "f4", 1, 5, IOTable);
+        IO_REG(BlackholeAccretionRate, "f4", 1, 5, IOTable);
+        IO_REG(BlackholeProgenitors,   "i4", 1, 5, IOTable);
+        IO_REG(BlackholeMinPotPos, "f8", 3, 5, IOTable);
+        IO_REG(BlackholeJumpToMinPot,   "i4", 1, 5, IOTable);
+        IO_REG(BlackholeMtrack,         "f4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeMseed,         "f4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeKineticFdbkEnergy, "f4", 1, 5, IOTable);
+    }
+    
+    else{
+        IO_REG_TYPE(StarFormationTime, "f4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeMass,          "f4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeDensity,          "f4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeAccretionRate, "f4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeProgenitors,   "i4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeMinPotPos, "f8", 3, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeJumpToMinPot,   "i4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeMtrack,         "f4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeMseed,         "f4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeKineticFdbkEnergy, "f4", 1, 5, IOTable);
+    }
 
     /* Smoothing lengths for black hole: this is a new addition*/
     IO_REG_NONFATAL(SmoothingLength,  "f4", 1, 5, IOTable);

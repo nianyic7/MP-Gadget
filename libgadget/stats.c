@@ -70,7 +70,7 @@ set_stats_params(ParameterSet * ps)
  *   (start-option 1), the code will append to these files.
  */
 void
-open_outputfiles(int RestartSnapNum, struct OutputFD * fds, const char * OutputDir, int BlackHoleOn, int StarformationOn)
+open_outputfiles(int RestartSnapNum, struct OutputFD * fds, const char * OutputDir, int BlackHoleOn, int StarformationOn, int ComovingIntegrationOn)
 {
     const char mode[3]="a+";
     char * buf;
@@ -84,6 +84,7 @@ open_outputfiles(int RestartSnapNum, struct OutputFD * fds, const char * OutputD
     fds->FdSfr = NULL;
     fds->FdBlackholeDetails = NULL;
     fds->FdHelium = NULL;
+    fds->FdBlackHoleDynamics = NULL;
 
     if(RestartSnapNum != -1) {
         postfix = fastpm_strdup_printf("-R%03d", RestartSnapNum);
@@ -99,6 +100,15 @@ open_outputfiles(int RestartSnapNum, struct OutputFD * fds, const char * OutputD
             endrun(1, "Failed to open blackhole detail %s\n", buf);
         myfree(buf);
     }
+    
+    /* Only output dynamics details as txt file in Non-cosmological sims*/
+    if(!ComovingIntegrationOn) {
+        buf = fastpm_strdup_printf("%s/%s%s", OutputDir, "blackhole-dynamics.txt", postfix,ThisTask);
+        fastpm_path_ensure_dirname(buf);
+        if(!(fds->FdBlackHoleDynamics = fopen(buf, mode)))
+            endrun(1, "error in opening file '%s'\n", buf);
+        myfree(buf);
+    }
 
     /* only the root processors writes to the log files */
     if(ThisTask != 0) {
@@ -112,6 +122,8 @@ open_outputfiles(int RestartSnapNum, struct OutputFD * fds, const char * OutputD
             endrun(1, "error in opening file '%s'\n", buf);
         myfree(buf);
     }
+    
+    
 
     buf = fastpm_strdup_printf("%s/%s%s", OutputDir, StatsParams.CpuFile, postfix);
     fastpm_path_ensure_dirname(buf);
@@ -157,6 +169,8 @@ close_outputfiles(struct OutputFD * fds)
         fclose(fds->FdSfr);
     if(fds->FdBlackHoles)
         fclose(fds->FdBlackHoles);
+    if(fds->FdBlackHoleDynamics)
+        fclose(fds->FdBlackHoleDynamics);
     if(fds->FdBlackholeDetails)
         fclose(fds->FdBlackholeDetails);
 }
@@ -354,4 +368,21 @@ void energy_statistics(FILE * FdEnergy, const double Time, struct part_manager_t
             SysState.MassComp[5]);
 
     fflush(FdEnergy);
+}
+
+
+
+void output_blackhole_dynamics(FILE * FdBlackHoleDynamics, const double Time, struct part_manager_type * PartManager)
+{
+    if(!FdBlackHoleDynamics)
+        return;
+    for(int i = 0; i < PartManager->NumPart; i++) {
+        if (P[i].Type == 5) {
+            fprintf(FdBlackHoleDynamics, "%g %g %g %g %g %g %g %g\n",
+            Time, P[i].Pos[0], P[i].Pos[1], P[i].Pos[2], P[i].Vel[0], P[i].Vel[1], P[i].Vel[2], 
+                  P[i].Potential);
+        }
+    }
+
+    fflush(FdBlackHoleDynamics);
 }

@@ -350,7 +350,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
 
     walltime_measure("/Misc");
     struct OutputFD fds;
-    open_outputfiles(RestartSnapNum, &fds, All.OutputDir, All.BlackHoleOn, All.StarformationOn);
+    open_outputfiles(RestartSnapNum, &fds, All.OutputDir, All.BlackHoleOn, All.StarformationOn, All.CP.ComovingIntegrationOn);
 
     write_cpu_log(NumCurrentTiStep, header->TimeSnapshot, fds.FdCPU, Clocks.ElapsedTime); /* produce some CPU usage info */
 
@@ -556,7 +556,9 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
                 /* Non-ComovingIntegration Note: need afac here as we are using atime purely for computing
                   physical quantities */
                 energy_statistics(fds.FdEnergy, afac, PartManager);
-
+            
+            if(fds.FdBlackHoleDynamics)
+                output_blackhole_dynamics(fds.FdBlackHoleDynamics, afac, PartManager);
         }
 
         /* Force tree object, reused if HierarchicalGravity is off.*/
