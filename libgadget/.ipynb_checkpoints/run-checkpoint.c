@@ -228,7 +228,7 @@ begrun(const int RestartSnapNum, struct header_data * head)
 
     const struct UnitSystem units = get_unitsystem(head->UnitLength_in_cm, head->UnitMass_in_g, head->UnitVelocity_in_cm_per_s);
     /* convert some physical input parameters to internal units */
-    init_cosmology(&All.CP, head->TimeIC, units);
+    init_cosmology(&All.CP, head->TimeIC, units); // ComovingIntegrationOn: good as long as no nutrino
 
     check_units(&All.CP, units);
 
@@ -250,6 +250,7 @@ begrun(const int RestartSnapNum, struct header_data * head)
     if(All.LightconeOn)
         lightcone_init(&All.CP, head->TimeSnapshot, head->UnitLength_in_cm, All.OutputDir);
 
+    // ComovingIntegrationOn: good as we have dealt with set_up_syncpoints
     init_timeline(&All.CP, RestartSnapNum, All.TimeMax, head, All.SnapshotWithFOF);
 
     /* Get the nk and do allocation. */
@@ -257,6 +258,7 @@ begrun(const int RestartSnapNum, struct header_data * head)
         init_neutrinos_lra(head->neutrinonk, head->TimeIC, All.TimeMax, All.CP.Omega0, &All.CP.ONu, All.CP.UnitTime_in_s, CM_PER_MPC);
 
     /* ... read initial model and initialise the times*/
+    // ComovingIntegrationOn: good as we have dealt with set_up_syncpoints
     inttime_t ti_init = init(RestartSnapNum, All.OutputDir, head, &All.CP);
 
     if(RestartSnapNum < 0) {
@@ -358,14 +360,12 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
     
     
     double atime = get_atime(times.Ti_Current);
+    double afac = atime;
     if (!All.CP.ComovingIntegrationOn) {
         atime = log(atime);
-    }
-    double afac = atime;
-    
-    if (!All.CP.ComovingIntegrationOn) {
         afac = 1.;
     }
+
 
     while(1) /* main loop */
     {
@@ -558,7 +558,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
                 energy_statistics(fds.FdEnergy, afac, PartManager);
             
             if(fds.FdBlackHoleDynamics)
-                output_blackhole_dynamics(fds.FdBlackHoleDynamics, afac, PartManager);
+                output_blackhole_dynamics(fds.FdBlackHoleDynamics, atime, PartManager);
         }
 
         /* Force tree object, reused if HierarchicalGravity is off.*/
@@ -733,6 +733,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
         message(0, "**** Passed calc FOF **** \n");
         /* WriteFOF just reminds the checkpoint code to save GroupID*/
         /* Non-ComovingIntegration Note: use atime=log(a) here to write snapshots*/
+        /* However, we need to define the conversion variable conv.atime=1 in petaio_save_checkpoint*/
         if(WriteSnapshot)
             write_checkpoint(SnapshotFileCount, WriteFOF, All.MetalReturnOn, atime, &All.CP, All.OutputDir, All.OutputDebugFields);
         message(0, "**** Saved checkpoint **** \n");

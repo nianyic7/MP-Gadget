@@ -171,9 +171,17 @@ petaio_save_snapshot(const char * fname, struct IOTable * IOTable, int verbose, 
     sumup_large_ints(6, ptype_count, NTotal);
 
     struct conversions conv = {0};
-    conv.atime = atime;
-    conv.hubble = hubble_function(CP, atime);
-
+    if (CP->ComovingIntegrationOn) {
+        conv.atime = atime;
+        conv.hubble = hubble_function(CP, atime);
+    } 
+    else {
+        conv.atime = 1.0;
+        conv.hubble = 1.0;
+    }
+    
+    
+    // Note: this atime remains log(a)
     petaio_write_header(&bf, atime, NTotal, CP, &Header);
 
     int i;
@@ -375,8 +383,8 @@ static void petaio_write_header(BigFile * bf, const double atime, const int64_t 
     }
 
     /* conversion from peculiar velocity to RSD */
-    const double hubble = hubble_function(CP, atime);
-    double RSD = 1.0 / (atime * hubble);
+    const double hubble = (CP->ComovingIntegrationOn) ? hubble_function(CP, atime) : 1.0;
+    double RSD = (CP->ComovingIntegrationOn) ? (1.0 / (atime * hubble)) : 1.0;
 
     if(!IO.UsePeculiarVelocity) {
         RSD /= atime; /* Conversion from internal velocity to RSD */
