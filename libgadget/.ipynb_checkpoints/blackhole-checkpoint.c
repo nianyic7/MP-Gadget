@@ -591,7 +591,7 @@ blackhole(const ActiveParticles * act, double atime, Cosmology * CP, ForceTree *
     else {
         priv->atime = 1.;
         priv->a3inv = 1.;
-        priv->hubble = 1.;
+        priv->hubble = 0.1;
         priv->CP = CP;
     }
 

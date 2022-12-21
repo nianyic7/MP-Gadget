@@ -218,11 +218,11 @@ hydro_force(const ActiveParticles * act, const double atime, struct sph_pred_dat
         HYDRA_GET_PRIV(tw)->hubble_a2 = hubble * atime * atime;
     }
     else {
-        const double hubble = 1.;
+        const double hubble = CP->Hubble;
         HYDRA_GET_PRIV(tw)->fac_mu = 1.;
-        HYDRA_GET_PRIV(tw)->fac_vsic_fix = 1.;
+        HYDRA_GET_PRIV(tw)->fac_vsic_fix = hubble;
         HYDRA_GET_PRIV(tw)->atime = 1.;
-        HYDRA_GET_PRIV(tw)->hubble_a2 = 1.;
+        HYDRA_GET_PRIV(tw)->hubble_a2 = hubble;
     }
     
     priv->times = &times;

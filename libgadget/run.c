@@ -656,13 +656,14 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
              * Also a good idea to only run it on a PM step.
              * This does not break the tree because the new black holes do not move or change mass, just type.*/
             
-            /* Non-ComovingIntegration Note: disable seeding of BHs for non-cosomological options for now*/
+            /* NYC: Non-ComovingIntegration Note: disable seeding of BHs for non-cosomological options for now*/
             if ((All.CP.ComovingIntegrationOn) && is_PM && ((All.BlackHoleOn && atime >= TimeNextSeedingCheck) ||
                 (during_helium_reionization(1/atime - 1) && need_change_helium_ionization_fraction(atime)) ||
                  (CalcUVBG && All.ExcursionSetReionOn))) {
 
                 /* Seeding: builds its own tree.*/
                 FOFGroups fof = fof_fof(ddecomp, 0, MPI_COMM_WORLD);
+                //NYC:BH Seeding not enabled for Non-ComovingIntegration
                 if(All.BlackHoleOn && atime >= TimeNextSeedingCheck) {
                     fof_seed(&fof, &Act, atime, MPI_COMM_WORLD);
                     TimeNextSeedingCheck = atime * All.TimeBetweenSeedingSearch;
@@ -670,9 +671,11 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
 
                 if(during_helium_reionization(1/atime - 1)) {
                     /* Helium reionization by switching on quasar bubbles*/
+                    //NYC: Helium reionization not enabled for Non-ComovingIntegration
                     do_heiii_reionization(atime, &fof, ddecomp, &All.CP, units.UnitInternalEnergy_in_cgs, fds.FdHelium);
                 }
                 //excursion set reionisation
+                //NYC: ExcursionSetReionOn not enabled for Non-ComovingIntegration
                 if(CalcUVBG && All.ExcursionSetReionOn) {
                     calculate_uvbg(&pm_mass, &pm_star, &pm_sfr, WriteSnapshot, SnapshotFileCount, All.OutputDir, atime, &All.CP, units);
                     message(0,"uvbg calculated\n");
@@ -691,11 +694,13 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
              */
             /* Black hole accretion and feedback */
             if(All.BlackHoleOn)
+                //NYC: afac here because it only enters into the physical quantity conversion (i.e. no timestep involved)
                 blackhole(&Act, afac, &All.CP, &Tree, ddecomp, &times, units, fds.FdBlackHoles, fds.FdBlackholeDetails);
             message(0, "**** Passed Black Hole stuff **** \n");
 
             /**** radiative cooling and star formation *****/
             if(All.CoolingOn)
+                //NYC: afac here because it only enters into the physical quantity conversion (i.e. no timestep involved)
                 cooling_and_starformation(&Act, afac, &times, get_dloga_for_bin(times.mintimebin, times.Ti_Current), &Tree, GravAccel, ddecomp, &All.CP, GradRho_mag, fds.FdSfr);
         }
         
@@ -738,6 +743,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             write_checkpoint(SnapshotFileCount, WriteFOF, All.MetalReturnOn, atime, &All.CP, All.OutputDir, All.OutputDebugFields);
         message(0, "**** Saved checkpoint **** \n");
         /* Save FOF tables after checkpoint so that if there is a FOF save bug we have particle tables available to debug it*/
+        //NYC: FOF not enabled for Non-ComovingIntegration
         if(WriteFOF) {
             fof_save_groups(&fof, All.OutputDir, All.FOFFileBase, SnapshotFileCount, &All.CP, atime, header->MassTable, All.MetalReturnOn, All.BlackHoleOn, MPI_COMM_WORLD);
             fof_finish(&fof);
@@ -747,6 +753,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
 #ifdef DEBUG
         check_kick_drift_times(PartManager, times.Ti_Current);
 #endif
+        //NYC: atime here because we want to get the real time in log file
         write_cpu_log(NumCurrentTiStep, atime, fds.FdCPU, Clocks.ElapsedTime);    /* produce some CPU usage info */
         message(0, "**** Passed cpu_log **** \n");
         
@@ -769,11 +776,11 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
         int badtimestep=0;
         if(!All.HierarchicalGravity) {
             message(0, "**** Inside Non-HierarchicalGravity **** \n");
-            const double asmth = pm.Asmth * PartManager->BoxSize / pm.Nmesh;
+            const double asmth = pm.Asmth * PartManager->BoxSize / pm.Nmesh; // TODO_NYC: asmth should not change with boxsize
             badtimestep = find_timesteps(&Act, &times, afac, All.FastParticleType, &All.CP, asmth, NumCurrentTiStep == 0);
             /* Update velocity and ti_kick to the new step, with the newly computed step size. Unsyncs ti_kick and ti_drift.
              * Both hydro and gravity are kicked.*/
-            apply_half_kick(&Act, &All.CP, &times, afac);
+            apply_half_kick(&Act, &All.CP, &times, afac); //NYC: afac here because it is only passed in do_hydro_kick() to get vel limits
             message(0, "**** Second Half Kick ****\n");
         } else {
             /* This finds the gravity timesteps, computes the gravitational forces
@@ -782,12 +789,13 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
              * each timebin has a force done individually and we do not store the acceleration hierarchy.
              * This does mean we double the cost of the force evaluations.*/
             if(totgravactive)
+                //NYC: Non-ComovingIntegration not enabled for hierarchical grav yet!
                 badtimestep = hierarchical_gravity_and_timesteps(&Act, &pm, ddecomp, GravAccel, &times, atime, HybridNuTracer, All.FastParticleType, &All.CP, All.OutputDir);
             if(GasEnabled) {
                 /* Find hydro timesteps and apply the hydro kick, unsyncing the drift and kick times. */
                 badtimestep += find_hydro_timesteps(&Act, &times, afac, &All.CP, NumCurrentTiStep == 0);
                 /* If there is no hydro kick to do we still need to update the kick times.*/
-                apply_hydro_half_kick(&Act, &All.CP, &times, afac);
+                apply_hydro_half_kick(&Act, &All.CP, &times, afac); 
             }
         }
         

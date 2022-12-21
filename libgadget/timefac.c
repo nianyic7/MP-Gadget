@@ -20,7 +20,7 @@ static double drift_integ(double a, void *param)
       
   Cosmology * CP = (Cosmology *) param;
   if (!CP->ComovingIntegrationOn)
-      return 1;
+      return 1.0 / CP->Hubble;
   double h = hubble_function(CP, a);
   return 1 / (h * a * a * a);
 }
@@ -31,7 +31,7 @@ static double gravkick_integ(double a, void *param)
       
   Cosmology * CP = (Cosmology *) param;
   if (!CP->ComovingIntegrationOn)
-      return 1;
+      return 1.0 / CP->Hubble;
   double h = hubble_function(CP, a);
 
   return 1 / (h * a * a);
@@ -43,7 +43,7 @@ static double hydrokick_integ(double a, void *param)
 {
   Cosmology * CP = (Cosmology *) param;
   if (!CP->ComovingIntegrationOn)
-      return 1;
+      return 1.0 / CP->Hubble;
   double h = hubble_function(CP, a);
 
   return 1 / (h * pow(a, 3 * GAMMA_MINUS1) * a);

@@ -736,7 +736,7 @@ find_timesteps(const ActiveParticles * act, DriftKickTimes * times, const double
         hubble = hubble_function(CP, atime);
     }
     else {
-        hubble = 1.0;
+        hubble = CP->Hubble;
     }
     
     /* Now assign new timesteps and kick */
