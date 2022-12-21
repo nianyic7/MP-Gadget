@@ -378,7 +378,7 @@ void output_blackhole_dynamics(FILE * FdBlackHoleDynamics, const double Time, st
         return;
     for(int i = 0; i < PartManager->NumPart; i++) {
         if (P[i].Type == 5) {
-            fprintf(FdBlackHoleDynamics, "%g %l %g %g %g %g %g %g %g\n",
+            fprintf(FdBlackHoleDynamics, "%g %ld %g %g %g %g %g %g %g\n",
             Time, P[i].ID, P[i].Pos[0] - PartManager->CurrentParticleOffset[0], 
                   P[i].Pos[1] - PartManager->CurrentParticleOffset[1], 
                   P[i].Pos[2] - PartManager->CurrentParticleOffset[2], 
