@@ -56,9 +56,13 @@ int hybrid_nu_tracer(const Cosmology * CP, double atime)
 {
     return CP->HybridNeutrinosOn && (atime <= CP->HybridNuPartTime);
 }
+
 /*Hubble function at scale factor a, in dimensions of CP.Hubble*/
 double hubble_function(const Cosmology * CP, double a)
 {
+    if (!CP->ComovingIntegrationOn) {
+        return CP->Hubble;
+    }
 
     double hubble_a;
 

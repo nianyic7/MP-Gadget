@@ -20,7 +20,7 @@ static double drift_integ(double a, void *param)
       
   Cosmology * CP = (Cosmology *) param;
   if (!CP->ComovingIntegrationOn)
-      return 1.0 / CP->Hubble;
+      return 1.0 / hubble_function(CP, a);
   double h = hubble_function(CP, a);
   return 1 / (h * a * a * a);
 }
@@ -31,7 +31,7 @@ static double gravkick_integ(double a, void *param)
       
   Cosmology * CP = (Cosmology *) param;
   if (!CP->ComovingIntegrationOn)
-      return 1.0 / CP->Hubble;
+      return 1.0 / hubble_function(CP, a);
   double h = hubble_function(CP, a);
 
   return 1 / (h * a * a);
@@ -43,9 +43,9 @@ static double hydrokick_integ(double a, void *param)
 {
   Cosmology * CP = (Cosmology *) param;
   if (!CP->ComovingIntegrationOn)
-      return 1.0 / CP->Hubble;
+      return 1.0 / hubble_function(CP, a);
+    
   double h = hubble_function(CP, a);
-
   return 1 / (h * pow(a, 3 * GAMMA_MINUS1) * a);
 }
 
@@ -62,6 +62,9 @@ static double get_exact_factor(Cosmology * CP, inttime_t t0, inttime_t t1, doubl
         a1 = exp(loga_from_ti(t1));
     }
     else {
+    /* In the Non-Comoving Case integrate wrt dloga
+        integrand = dt = dloga / H(a) = dloga / H0
+    */
         a0 = loga_from_ti(t0);
         a1 = loga_from_ti(t1);
     }

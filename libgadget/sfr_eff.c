@@ -198,14 +198,12 @@ cooling_and_starformation(ActiveParticles * act, double Time, const DriftKickTim
     const int nactive = act->NumActiveParticle;
     
     double a3inv, hubble;
-    if (CP->ComovingIntegrationOn) {
-        a3inv = 1./(Time * Time * Time);
-        hubble = hubble_function(CP, Time);
-    }
-    else {
-        a3inv = 1.0;
-        hubble = 1.0;
-    }
+    
+    // Non-ComovingIntegration Note
+    // Time = afac = 1 when passed into this function
+    a3inv = 1./(Time * Time * Time);
+    hubble = hubble_function(CP, Time);
+
     
 
     if(sfr_params.StarformationOn) {

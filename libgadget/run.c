@@ -362,8 +362,11 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
     double atime = get_atime(times.Ti_Current);
     double afac = atime;
     if (!All.CP.ComovingIntegrationOn) {
+        double hubble;
         atime = log(atime);
         afac = 1.;
+        hubble = hubble_function(&All.CP, 1.0);
+        message(0, "********** TEST HUBBLE ************** %g \n", hubble);
     }
 
 
@@ -412,7 +415,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
         next_sync = find_next_sync_point(times.Ti_Current);
         planned_sync = find_current_sync_point(times.Ti_Current);
         
-        message(0, "**** next_sync = %g, planned_sync = %g***** \n", next_sync, planned_sync);
+        message(0, "**** next_sync = %d, planned_sync = %d***** \n", next_sync, planned_sync);
 
         HCIAction action[1];
 

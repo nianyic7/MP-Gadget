@@ -210,21 +210,18 @@ hydro_force(const ActiveParticles * act, const double atime, struct sph_pred_dat
     walltime_measure("/SPH/Hydro/Init");
 
     /* Initialize some time factors*/
-    if (CP->ComovingIntegrationOn) {
-        const double hubble = hubble_function(CP, atime);
-        HYDRA_GET_PRIV(tw)->fac_mu = pow(atime, 3 * (GAMMA - 1) / 2) / atime;
-        HYDRA_GET_PRIV(tw)->fac_vsic_fix = hubble * pow(atime, 3 * GAMMA_MINUS1);
-        HYDRA_GET_PRIV(tw)->atime = atime;
-        HYDRA_GET_PRIV(tw)->hubble_a2 = hubble * atime * atime;
-    }
-    else {
-        const double hubble = CP->Hubble;
-        HYDRA_GET_PRIV(tw)->fac_mu = 1.;
-        HYDRA_GET_PRIV(tw)->fac_vsic_fix = hubble;
-        HYDRA_GET_PRIV(tw)->atime = 1.;
-        HYDRA_GET_PRIV(tw)->hubble_a2 = hubble;
-    }
     
+    // Non-ComovingIntegration Note: 
+    // atime=afac = 1 when passed into this function, so we are good
+    // with the original time factors
+    
+    const double hubble = hubble_function(CP, atime);
+    HYDRA_GET_PRIV(tw)->fac_mu = pow(atime, 3 * (GAMMA - 1) / 2) / atime;
+    HYDRA_GET_PRIV(tw)->fac_vsic_fix = hubble * pow(atime, 3 * GAMMA_MINUS1);
+    HYDRA_GET_PRIV(tw)->atime = atime;
+    HYDRA_GET_PRIV(tw)->hubble_a2 = hubble * atime * atime;
+    
+
     priv->times = &times;
     priv->FgravkickB = get_exact_gravkick_factor(CP, times.PM_kick, times.Ti_Current);
     memset(priv->gravkicks, 0, sizeof(priv->gravkicks[0])*(TIMEBINS+1));

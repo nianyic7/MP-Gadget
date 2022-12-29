@@ -171,14 +171,17 @@ petaio_save_snapshot(const char * fname, struct IOTable * IOTable, int verbose, 
     sumup_large_ints(6, ptype_count, NTotal);
 
     struct conversions conv = {0};
-    if (CP->ComovingIntegrationOn) {
+    
+    // Non-Comoving Integration Note:
+    // atime = loga when passed into this function!
+    // This is because it needs to be written into the header
+    
+    if (CP->ComovingIntegrationOn)
         conv.atime = atime;
-        conv.hubble = hubble_function(CP, atime);
-    } 
-    else {
+    else
         conv.atime = 1.0;
-        conv.hubble = CP->Hubble;
-    }
+    
+    conv.hubble = hubble_function(CP, conv.atime);
     
     
     // Note: this atime remains log(a)

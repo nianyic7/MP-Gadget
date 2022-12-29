@@ -731,13 +731,7 @@ find_timesteps(const ActiveParticles * act, DriftKickTimes * times, const double
         times->PM_start = times->PM_kick;
     }
     
-    double hubble;
-    if (CP->ComovingIntegrationOn) {
-        hubble = hubble_function(CP, atime);
-    }
-    else {
-        hubble = CP->Hubble;
-    }
+    double hubble = hubble_function(CP, atime);
     
     /* Now assign new timesteps and kick */
     if(TimestepParams.ForceEqualTimesteps) {
@@ -1068,7 +1062,7 @@ get_timestep_gravity_dloga(const int p, const MyFloat * const GravAccel, const d
 static double
 get_timestep_hydro_dloga(const int p, const inttime_t Ti_Current, const double atime, const double hubble, enum TimeStepType * titype)
 {
-    /* Non-ComovingIntegration Note: atime = 1, hubble = 1 when passed to this function*/
+    /* Non-ComovingIntegration Note: atime = 1, hubble = 0.1 when passed to this function*/
     double dt = 1;
     *titype = TI_ACCEL;
 
@@ -1171,7 +1165,7 @@ get_long_range_timestep_dloga(const double atime, const Cosmology * CP, const in
     int64_t count_sum[6];
     double v[6], v_sum[6], mim[6], min_mass[6];
     double dloga = TimestepParams.MaxSizeTimestep;
-    double hubble;
+    double hubble = hubble_function(CP, atime);
 
     if (CP->ComovingIntegrationOn) { 
         for(type = 0; type < 6; type++)
