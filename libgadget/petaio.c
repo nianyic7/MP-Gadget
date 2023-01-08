@@ -176,10 +176,14 @@ petaio_save_snapshot(const char * fname, struct IOTable * IOTable, int verbose, 
     // atime = loga when passed into this function!
     // This is because it needs to be written into the header
     
-    if (CP->ComovingIntegrationOn)
+    if (CP->ComovingIntegrationOn) {
         conv.atime = atime;
-    else
+        conv.ComovingIntegrationOn = 1;
+    }
+    else {
         conv.atime = 1.0;
+        conv.ComovingIntegrationOn = 0;
+    }
     
     conv.hubble = hubble_function(CP, conv.atime);
     
@@ -290,8 +294,17 @@ petaio_read_snapshot(int num, const char * OutputDir, Cosmology * CP, struct hea
     }
 
     struct conversions conv = {0};
-    conv.atime = header->TimeSnapshot;
-    conv.hubble = hubble_function(CP, header->TimeSnapshot);
+    
+    if (CP->ComovingIntegrationOn) {
+        conv.atime = header->TimeSnapshot;
+        conv.hubble = hubble_function(CP, header->TimeSnapshot);
+        conv.ComovingIntegrationOn = 1;
+    }
+    else {
+        conv.atime = 1.0;
+        conv.hubble = hubble_function(CP, 1.0);
+        conv.ComovingIntegrationOn = 0;
+    }
 
     struct IOTable IOTable[1] = {0};
     /* Always try to read the metal tables.
@@ -767,7 +780,7 @@ static void GTVelocity(int i, float * out, void * baseptr, void * smanptr, const
     double fac;
     struct particle_data * part = (struct particle_data *) baseptr;
     
-    if ((PartManager->NonPeriodic) || (!IO.UsePeculiarVelocity)) {
+    if ((!params->ComovingIntegrationOn) || (!IO.UsePeculiarVelocity)) {
         fac = 1.0;
     }
     else {
@@ -778,11 +791,15 @@ static void GTVelocity(int i, float * out, void * baseptr, void * smanptr, const
     for(d = 0; d < 3; d ++) {
         out[d] = fac * part[i].Vel[d];
     }
+    
+    if (i <= 20) {
+        message(0, "** Inside GTVelocity , fac = %g \n **", fac);
+    }
 }
 static void STVelocity(int i, float * out, void * baseptr, void * smanptr, const struct conversions * params) {
     double fac;
     struct particle_data * part = (struct particle_data *) baseptr;
-    if ((PartManager->NonPeriodic) || (!IO.UsePeculiarVelocity)) {
+    if ((!params->ComovingIntegrationOn) || (!IO.UsePeculiarVelocity)) {
         fac = 1.0;
     }
     else {
@@ -793,6 +810,11 @@ static void STVelocity(int i, float * out, void * baseptr, void * smanptr, const
     for(d = 0; d < 3; d ++) {
         part[i].Vel[d] = out[d] * fac;
     }
+    
+    if (i <= 20) {
+        message(0, "** Inside STVelocity, fac = %g, velx = %g, vely = %g, velz = %g\n **", fac, part[i].Vel[0], part[i].Vel[1], part[i].Vel[2]);
+    }
+    
 }
 SIMPLE_PROPERTY(Mass, Mass, float, 1)
 SIMPLE_PROPERTY(ID, ID, uint64_t, 1)
