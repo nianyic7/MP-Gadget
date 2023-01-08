@@ -126,10 +126,16 @@ inttime_t init(int RestartSnapNum, const char * OutputDir, struct header_data * 
     /* As the above will mostly take place
      * on Task 0, there will be a lot of imbalance*/
     MPIU_Barrier(MPI_COMM_WORLD);
-
-    gravshort_set_softenings(MeanSeparation[1]);
+    if (CP->ComovingIntegrationOn) { 
+        gravshort_set_softenings(MeanSeparation[1]);
+    }
+    else {
+    // sets the absolute softening length in kpc
+        gravshort_set_softenings(1.0);
+    }
     fof_init(MeanSeparation[1]);
     inttime_t Ti_Current;
+    // NYC note: double checked this is correct
     if (CP->ComovingIntegrationOn) {
          Ti_Current = init_timebins(header->TimeSnapshot);
     }

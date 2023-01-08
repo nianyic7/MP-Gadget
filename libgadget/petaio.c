@@ -314,12 +314,6 @@ petaio_read_snapshot(int num, const char * OutputDir, Cosmology * CP, struct hea
             keep |= (0 == strcmp(IOTable->ent[i].name, "Position"));
             keep |= (0 == strcmp(IOTable->ent[i].name, "Velocity"));
             keep |= (0 == strcmp(IOTable->ent[i].name, "ID"));
-            
-            if (!CP->ComovingIntegrationOn) {
-                if (ptype == 0) {
-                     keep |= (0 == strcmp(IOTable->ent[i].name, "Entropy"));
-                     keep |= (0 == strcmp(IOTable->ent[i].name, "Density"));
-                }
             }
             if (ptype == 5) {
                 keep |= (0 == strcmp(IOTable->ent[i].name, "Mass"));
@@ -386,7 +380,7 @@ static void petaio_write_header(BigFile * bf, const double atime, const int64_t 
     }
 
     /* conversion from peculiar velocity to RSD */
-    const double hubble = (CP->ComovingIntegrationOn) ? hubble_function(CP, atime) : 1.0;
+    const double hubble = hubble_function(CP, atime);
     double RSD = (CP->ComovingIntegrationOn) ? (1.0 / (atime * hubble)) : (1.0/CP->Hubble);
 
     if(!IO.UsePeculiarVelocity) {
@@ -772,14 +766,14 @@ static void GTVelocity(int i, float * out, void * baseptr, void * smanptr, const
     /* Convert to Peculiar Velocity if UsePeculiarVelocity is set */
     double fac;
     struct particle_data * part = (struct particle_data *) baseptr;
-    if (IO.UsePeculiarVelocity) {
+    
+    if ((PartManager->NonPeriodic) || (!IO.UsePeculiarVelocity)) {
+        fac = 1.0;
+    }
+    else {
         fac = 1.0 / params->atime;
-    } else {
-        fac = 1.0;
     }
-    if (PartManager->NonPeriodic) {
-        fac = 1.0;
-    }
+
     int d;
     for(d = 0; d < 3; d ++) {
         out[d] = fac * part[i].Vel[d];
@@ -788,13 +782,11 @@ static void GTVelocity(int i, float * out, void * baseptr, void * smanptr, const
 static void STVelocity(int i, float * out, void * baseptr, void * smanptr, const struct conversions * params) {
     double fac;
     struct particle_data * part = (struct particle_data *) baseptr;
-    if (IO.UsePeculiarVelocity) {
-        fac = params->atime;
-    } else {
+    if ((PartManager->NonPeriodic) || (!IO.UsePeculiarVelocity)) {
         fac = 1.0;
     }
-    if (PartManager->NonPeriodic) {
-        fac = 1.0;
+    else {
+        fac = params->atime;
     }
 
     int d;

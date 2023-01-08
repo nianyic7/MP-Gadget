@@ -61,7 +61,7 @@ int hybrid_nu_tracer(const Cosmology * CP, double atime)
 double hubble_function(const Cosmology * CP, double a)
 {
     if (!CP->ComovingIntegrationOn) {
-        return CP->Hubble;
+        return 1.0;
     }
 
     double hubble_a;

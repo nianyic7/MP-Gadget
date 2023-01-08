@@ -105,7 +105,7 @@ open_outputfiles(int RestartSnapNum, struct OutputFD * fds, const char * OutputD
     if(!ComovingIntegrationOn) {
         buf = fastpm_strdup_printf("%s/%s%s", OutputDir, "blackhole-dynamics.txt", postfix,ThisTask);
         fastpm_path_ensure_dirname(buf);
-        if(!(fds->FdBlackHoleDynamics = fopen(buf, mode)))
+        if(!(fds->FdBlackHoleDynamics = fopen(buf, "w+")))
             endrun(1, "error in opening file '%s'\n", buf);
         myfree(buf);
     }

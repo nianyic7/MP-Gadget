@@ -559,10 +559,9 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
                 /* Non-ComovingIntegration Note: need afac here as we are using atime purely for computing
                   physical quantities */
                 energy_statistics(fds.FdEnergy, afac, PartManager);
-            
-            if(fds.FdBlackHoleDynamics)
-                output_blackhole_dynamics(fds.FdBlackHoleDynamics, atime, PartManager);
         }
+        if(fds.FdBlackHoleDynamics)
+            output_blackhole_dynamics(fds.FdBlackHoleDynamics, atime, PartManager);
 
         /* Force tree object, reused if HierarchicalGravity is off.*/
         ForceTree Tree = {0};
