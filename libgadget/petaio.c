@@ -314,7 +314,7 @@ petaio_read_snapshot(int num, const char * OutputDir, Cosmology * CP, struct hea
             keep |= (0 == strcmp(IOTable->ent[i].name, "Position"));
             keep |= (0 == strcmp(IOTable->ent[i].name, "Velocity"));
             keep |= (0 == strcmp(IOTable->ent[i].name, "ID"));
-            }
+            
             if (ptype == 5) {
                 keep |= (0 == strcmp(IOTable->ent[i].name, "Mass"));
                 keep |= (0 == strcmp(IOTable->ent[i].name, "BlackholeMass"));
