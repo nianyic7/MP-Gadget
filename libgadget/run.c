@@ -383,7 +383,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
 
         times.Ti_Current = Ti_Next;
         
-        message(1, "***** timestep checks: Ti_last=%d, Ti_current=%d *******\n", Ti_Last, times.Ti_Current);
+        message(0, "***** timestep checks: Ti_last=%d, Ti_current=%d *******\n", Ti_Last, times.Ti_Current);
 
         /*Convert back to floating point time*/
         double newatime = get_atime(times.Ti_Current);
