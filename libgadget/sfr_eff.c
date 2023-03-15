@@ -112,7 +112,7 @@ struct sfr_eeqos_data
 static struct sfr_eeqos_data get_sfr_eeqos(struct particle_data * part, struct sph_particle_data * sph, double dtime, struct UVBG *local_uvbg, const double redshift, const double a3inv);
 
 /*Cooling only: no star formation*/
-static void cooling_direct(int i, const double redshift, const double a3inv, const double hubble, const struct UVBG * const GlobalUVBG);
+static void cooling_direct(int i, const double redshift, const double a3inv, const double hubble, const struct UVBG * const GlobalUVBG, const int ComovingIntegrationOn);
 
 static void cooling_relaxed(int i, double dtime, struct UVBG * local_uvbg, const double redshift, const double a3inv, struct sfr_eeqos_data sfr_data, const struct UVBG * const GlobalUVBG);
 
@@ -196,6 +196,8 @@ cooling_and_starformation(ActiveParticles * act, double Time, double dloga, Forc
     /*Need to capture this so that when NumActiveParticle increases during the loop
      * we don't add extra loop iterations on particles with invalid slots.*/
     const int nactive = act->NumActiveParticle;
+    // Non-ComovingIntegration Note
+    // Time = afac = 1 when passed into this function
     const double a3inv = 1./(Time * Time * Time);
     const double hubble = hubble_function(CP, Time);
 
@@ -217,7 +219,13 @@ cooling_and_starformation(ActiveParticles * act, double Time, double dloga, Forc
 
 
     /* Get the global UVBG for this redshift. */
-    const double redshift = 1./Time - 1;
+    double redshift;
+    if (CP->ComovingIntegrationOn) {
+        redshift = 1./Time - 1;
+    }
+    else {
+        redshift = 0.;
+    }
     struct UVBG GlobalUVBG = get_global_UVBG(redshift);
     double sum_sm = 0, sum_mass_stars = 0, localsfr = 0;
 
@@ -275,7 +283,7 @@ cooling_and_starformation(ActiveParticles * act, double Time, double dloga, Forc
                 }
             }
             else
-                cooling_direct(p_i, redshift, a3inv, hubble, &GlobalUVBG);
+                cooling_direct(p_i, redshift, a3inv, hubble, &GlobalUVBG, CP->ComovingIntegrationOn);
         }
     }
 
@@ -441,7 +449,7 @@ sfr_reserve_slots(ActiveParticles * act, int * NewStars, int NumNewStar, ForceTr
 }
 
 static void
-cooling_direct(int i, const double redshift, const double a3inv, const double hubble, const struct UVBG * const GlobalUVBG)
+cooling_direct(int i, const double redshift, const double a3inv, const double hubble, const struct UVBG * const GlobalUVBG, const int ComovingIntegrationOn)
 {
     /*  the actual time-step */
     double dloga = get_dloga_for_bin(P[i].TimeBinHydro, P[i].Ti_drift);
@@ -460,8 +468,15 @@ cooling_direct(int i, const double redshift, const double a3inv, const double hu
     zreion = SPHP(i).zreion;
 #endif
     struct UVBG uvbg = get_local_UVBG(redshift, GlobalUVBG, P[i].Pos, PartManager->CurrentParticleOffset, localJ21, zreion);
-    double lasttime = exp(loga_from_ti(P[i].Ti_drift - dti_from_timebin(P[i].TimeBinHydro)));
-    double lastred = 1/lasttime - 1;
+        double lasttime, lastred;
+    if (ComovingIntegrationOn) {
+        lasttime = exp(loga_from_ti(P[i].Ti_drift - dti_from_timebin(P[i].TimeBinHydro)));
+        lastred = 1/lasttime - 1;
+    }
+    else {
+        lasttime = 1.;
+        lastred = 0.;
+    }
     double unew;
     /* The particle reionized this timestep, bump the temperature to the HI reionization temperature.
      * We only do this for non-star-forming gas.*/
@@ -711,8 +726,12 @@ quicklyastarformation(int i, const double a3inv)
 static int
 starformation(int i, double *localsfr, MyFloat * sm_out, MyFloat * GradRho, const double redshift, const double a3inv, const double hubble, const double GravInternal, const struct UVBG * const GlobalUVBG)
 {
+    /* Non-ComovingIntegration Note:
+     a3inv=1,redshift=0 (therefore atime=1), hubble=1 (therfore dtime=dloga), and  when passed to this function. */
+    /* Need to check if get_local_UVBG(redshift) is ok with redshift=0 */
     /*  the proper time-step */
     double dloga = get_dloga_for_bin(P[i].TimeBinHydro, P[i].Ti_drift);
+    /*hubble is already set to one within cooling_and_starformation, so we are good*/
     double dtime = dloga / hubble;
     int newstar = -1;
     double localJ21 = 0;
@@ -772,6 +791,8 @@ starformation(int i, double *localsfr, MyFloat * sm_out, MyFloat * GradRho, cons
  * equation of state model for a particle.*/
 struct sfr_eeqos_data get_sfr_eeqos(struct particle_data * part, struct sph_particle_data * sph, double dtime, struct UVBG *local_uvbg, const double redshift, const double a3inv)
 {
+    /* Non-ComovingIntegration Note:
+     dtime=dloga,a3inv=1,redshift=0 when passed to this function. Need to check if it's save to set redshift=0; otherwise we're good */
     struct sfr_eeqos_data data;
     /* Initialise data to something, just in case.*/
     data.trelax = sfr_params.MaxSfrTimescale;
@@ -809,6 +830,8 @@ struct sfr_eeqos_data get_sfr_eeqos(struct particle_data * part, struct sph_part
 
 static double get_starformation_rate_full(int i, MyFloat * GradRho, struct sfr_eeqos_data sfr_data, const double atime, const double a3inv, const double hubble, const double GravInternal)
 {
+    /* Non-ComovingIntegration Note:
+     atime,a3inv,hubble are already 1 when passed to this fhunction, and it's consistent with the functions called in here*/
     if(!sfreff_on_eeqos(&SPHP(i), a3inv)) {
         return 0;
     }

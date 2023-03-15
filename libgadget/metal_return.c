@@ -151,6 +151,7 @@ static double chabrier_imf(double mass)
     }
 }
 
+// NYC TODO: this needs to be changed
 double atime_integ(double atime, void * params)
 {
     Cosmology * CP = (Cosmology *) params;

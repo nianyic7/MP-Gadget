@@ -16,7 +16,7 @@ struct OutputFD
 
 void set_stats_params(ParameterSet * ps);
 
-void open_outputfiles(int RestartSnapNum, struct OutputFD * fds, const char * OutputDir, int BlackHoleOn, int StarformationOn);
+void open_outputfiles(int RestartSnapNum, struct OutputFD * fds, const char * OutputDir, int BlackHoleOn, int StarformationOn, int ComovingIntegrationOn);
 void close_outputfiles(struct OutputFD *fds);
 
 /* Write out a CPU log file*/
@@ -24,4 +24,7 @@ void write_cpu_log(int NumCurrentTiStep, const double atime, FILE * FdCPU, doubl
 
 /* Write out overall statistics of the energy of the simulation */
 void energy_statistics(FILE * FdEnergy, const double Time,  struct part_manager_type * PartManager);
+
+void output_blackhole_dynamics(FILE * FdBlackHoleDynamics, const double Time, struct part_manager_type * PartManager);
+
 #endif

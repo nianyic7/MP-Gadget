@@ -735,7 +735,7 @@ find_timesteps(const ActiveParticles * act, DriftKickTimes * times, const double
         times->PM_start = times->PM_kick;
     }
 
-    const double hubble = hubble_function(CP, atime);
+    double hubble = hubble_function(CP, atime);
     /* Now assign new timesteps and kick */
     if(TimestepParams.ForceEqualTimesteps) {
         dti_min = find_global_timestep(times, dti_max, atime, hubble);
@@ -985,6 +985,7 @@ do_grav_short_range_kick(struct particle_data * part, const MyFloat * const Grav
 void
 do_hydro_kick(int i, double dt_entr, double Fgravkick, double Fhydrokick, const double atime)
 {
+    /* Non-ComovingIntegration Note: atime = 1 when passed to this function*/
     int j;
     /* Add kick from dynamic friction and hydro drag for BHs. */
     if(P[i].Type == 5) {
@@ -1027,6 +1028,7 @@ do_hydro_kick(int i, double dt_entr, double Fgravkick, double Fhydrokick, const 
 
 static double grav_acceleration2(const int p, const MyFloat * const GravAccel, const double atime)
 {
+    /* Non-ComovingIntegration Note: atime = 1 when passed to this function*/
     /*Compute physical acceleration*/
     const double a2inv = 1/(atime * atime);
     double ax = a2inv * GravAccel[0];
@@ -1045,6 +1047,7 @@ static double grav_acceleration2(const int p, const MyFloat * const GravAccel, c
 static double
 get_timestep_gravity_dloga(const int p, const MyFloat * const GravAccel, const double atime, const double hubble)
 {
+    /* Non-ComovingIntegration Note: atime = 1 when passed to this function*/
     double ac = sqrt(grav_acceleration2(p, GravAccel, atime));
     /* mind the factor 2.8 difference between gravity and softening used here. */
     double dt = sqrt(2 * TimestepParams.ErrTolIntAccuracy * atime * (FORCE_SOFTENING(p, P[p].Type) / 2.8) / ac);
@@ -1057,6 +1060,7 @@ get_timestep_gravity_dloga(const int p, const MyFloat * const GravAccel, const d
 static double
 get_timestep_hydro_dloga(const int p, const inttime_t Ti_Current, const double atime, const double hubble, enum TimeStepType * titype)
 {
+    /* Non-ComovingIntegration Note: atime = 1 when passed to this function*/
     double dt = 1;
     *titype = TI_ACCEL;
 
@@ -1152,82 +1156,86 @@ print_bad_timebin(const double dloga, const inttime_t dti, const int p, const in
 double
 get_long_range_timestep_dloga(const double atime, const Cosmology * CP, const int FastParticleType, const double asmth)
 {
+    /* Non-ComovingIntegration Note: atime = 1 when passed to this function*/
+    /* Non-ComovingIntegration Note2: skip the computation if not cosmological (same as Pgadget3)*/
     int i, type;
     int count[6];
     int64_t count_sum[6];
     double v[6], v_sum[6], mim[6], min_mass[6];
     double dloga = TimestepParams.MaxSizeTimestep;
+    double hubble = hubble_function(CP, atime);
 
-    for(type = 0; type < 6; type++)
-    {
-        count[type] = 0;
-        v[type] = 0;
-        mim[type] = 1.0e30;
-    }
-
-    for(i = 0; i < PartManager->NumPart; i++)
-    {
-        v[P[i].Type] += P[i].Vel[0] * P[i].Vel[0] + P[i].Vel[1] * P[i].Vel[1] + P[i].Vel[2] * P[i].Vel[2];
-        if(P[i].Mass > 0)
+    if (CP->ComovingIntegrationOn) { 
+        for(type = 0; type < 6; type++)
         {
-            if(mim[P[i].Type] > P[i].Mass)
-                mim[P[i].Type] = P[i].Mass;
+            count[type] = 0;
+            v[type] = 0;
+            mim[type] = 1.0e30;
         }
-        count[P[i].Type]++;
-    }
 
-    MPI_Allreduce(v, v_sum, 6, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-    MPI_Allreduce(mim, min_mass, 6, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-
-    sumup_large_ints(6, count, count_sum);
-
-    /* add star, gas and black hole particles together to treat them on equal footing,
-     * using the original gas particle spacing. */
-    v_sum[0] += v_sum[4];
-    count_sum[0] += count_sum[4];
-    v_sum[4] = v_sum[0];
-    count_sum[4] = count_sum[0];
-    v_sum[0] += v_sum[5];
-    count_sum[0] += count_sum[5];
-    v_sum[5] = v_sum[0];
-    count_sum[5] = count_sum[0];
-
-    min_mass[5] = min_mass[0];
-
-    const double hubble = hubble_function(CP, atime);
-    for(type = 0; type < 6; type++)
-    {
-        if(count_sum[type] > 0)
+        for(i = 0; i < PartManager->NumPart; i++)
         {
-            double omega, dmean, dloga1;
-            /* Type 4 is stars, type 5 is BHs, both baryons*/
-            if(type == 0 || type == 4 || type == 5) {
-                omega = CP->OmegaBaryon;
+            v[P[i].Type] += P[i].Vel[0] * P[i].Vel[0] + P[i].Vel[1] * P[i].Vel[1] + P[i].Vel[2] * P[i].Vel[2];
+            if(P[i].Mass > 0)
+            {
+                if(mim[P[i].Type] > P[i].Mass)
+                    mim[P[i].Type] = P[i].Mass;
             }
-            /* In practice usually FastParticleType == 2
-             * so this doesn't matter. */
-            else if (type == 2) {
-                omega = get_omega_nu(&CP->ONu, 1);
-            } else {
-                omega = CP->OmegaCDM;
+            count[P[i].Type]++;
+        }
+
+        MPI_Allreduce(v, v_sum, 6, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+        MPI_Allreduce(mim, min_mass, 6, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+
+        sumup_large_ints(6, count, count_sum);
+
+        /* add star, gas and black hole particles together to treat them on equal footing,
+         * using the original gas particle spacing. */
+        v_sum[0] += v_sum[4];
+        count_sum[0] += count_sum[4];
+        v_sum[4] = v_sum[0];
+        count_sum[4] = count_sum[0];
+        v_sum[0] += v_sum[5];
+        count_sum[0] += count_sum[5];
+        v_sum[5] = v_sum[0];
+        count_sum[5] = count_sum[0];
+
+        min_mass[5] = min_mass[0];
+
+
+        for(type = 0; type < 6; type++)
+        {
+            if(count_sum[type] > 0)
+            {
+                double omega, dmean, dloga1;
+                /* Type 4 is stars, type 5 is BHs, both baryons*/
+                if(type == 0 || type == 4 || type == 5) {
+                    omega = CP->OmegaBaryon;
+                }
+                /* In practice usually FastParticleType == 2
+                 * so this doesn't matter. */
+                else if (type == 2) {
+                    omega = get_omega_nu(&CP->ONu, 1);
+                } else {
+                    omega = CP->OmegaCDM;
+                }
+                /* "Avg. radius" of smallest particle: (min_mass/total_mass)^1/3 */
+                dmean = pow(min_mass[type] / (omega * CP->RhoCrit), 1.0 / 3);
+
+                dloga1 = TimestepParams.MaxRMSDisplacementFac * hubble * atime * atime * DMIN(asmth, dmean) / sqrt(v_sum[type] / count_sum[type]);
+                message(0, "type=%d  dmean=%g asmth=%g minmass=%g a=%g  sqrt(<p^2>)=%g  dloga=%g\n",
+                        type, dmean, asmth, min_mass[type], atime, sqrt(v_sum[type] / count_sum[type]), dloga1);
+
+                /* don't constrain the step to the neutrinos */
+                if(type != FastParticleType && dloga1 < dloga)
+                    dloga = dloga1;
             }
-            /* "Avg. radius" of smallest particle: (min_mass/total_mass)^1/3 */
-            dmean = pow(min_mass[type] / (omega * CP->RhoCrit), 1.0 / 3);
+        }
 
-            dloga1 = TimestepParams.MaxRMSDisplacementFac * hubble * atime * atime * DMIN(asmth, dmean) / sqrt(v_sum[type] / count_sum[type]);
-            message(0, "type=%d  dmean=%g asmth=%g minmass=%g a=%g  sqrt(<p^2>)=%g  dloga=%g\n",
-                    type, dmean, asmth, min_mass[type], atime, sqrt(v_sum[type] / count_sum[type]), dloga1);
-
-            /* don't constrain the step to the neutrinos */
-            if(type != FastParticleType && dloga1 < dloga)
-                dloga = dloga1;
+        if(dloga < TimestepParams.MinSizeTimestep) {
+            dloga = TimestepParams.MinSizeTimestep;
         }
     }
-
-    if(dloga < TimestepParams.MinSizeTimestep) {
-        dloga = TimestepParams.MinSizeTimestep;
-    }
-
     return dloga;
 }
 

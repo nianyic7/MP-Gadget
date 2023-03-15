@@ -72,7 +72,15 @@ void init_timeline(Cosmology * CP, int RestartSnapNum, double TimeMax, const str
         /* If TimeInit is not in a sensible place on the integer timeline
          * (can happen if the outputs changed since it was written)
          * start the integer timeline anew from TimeInit */
-        inttime_t ti_init = ti_from_loga(log(header->TimeSnapshot)) % TIMEBASE;
+                inttime_t ti_init;
+        if (CP->ComovingIntegrationOn) {
+            ti_init = ti_from_loga(log(header->TimeSnapshot)) % TIMEBASE;
+        }
+        else {
+            ti_init = ti_from_loga(header->TimeSnapshot) % TIMEBASE;
+        }
+
+        message(0,"****** Init Timeline check: header->TimeIC=%g, ti_init = %x \n",header->TimeIC, ti_init);
         if(round_down_power_of_two(ti_init) != ti_init) {
             message(0,"Resetting integer timeline (as %x != %x) to current snapshot\n",ti_init, round_down_power_of_two(ti_init));
             setup_sync_points(CP, header->TimeSnapshot, TimeMax, header->TimeSnapshot, SnapshotWithFOF);
@@ -101,7 +109,9 @@ inttime_t init(int RestartSnapNum, const char * OutputDir, struct header_data * 
 
     domain_test_id_uniqueness(PartManager);
 
-    check_omega(PartManager, CP, get_generations(), header->MassTable);
+    if (CP->ComovingIntegrationOn) {
+        check_omega(PartManager, CP, get_generations(), header->MassTable);
+    }
 
     check_positions(PartManager);
 
@@ -116,10 +126,24 @@ inttime_t init(int RestartSnapNum, const char * OutputDir, struct header_data * 
      * on Task 0, there will be a lot of imbalance*/
     MPIU_Barrier(MPI_COMM_WORLD);
 
-    gravshort_set_softenings(MeanSeparation[1]);
+    if (CP->ComovingIntegrationOn) { 
+        gravshort_set_softenings(MeanSeparation[1]);
+    }
+    else {
+    // sets the absolute softening length in kpc
+        gravshort_set_softenings(1.0);
+    }
+    
     fof_init(MeanSeparation[1]);
 
-    inttime_t Ti_Current = init_timebins(header->TimeSnapshot);
+    inttime_t Ti_Current;
+    // NYC note: double checked this is correct
+    if (CP->ComovingIntegrationOn) {
+         Ti_Current = init_timebins(header->TimeSnapshot);
+    }
+    else {
+        Ti_Current = init_timebins(exp(header->TimeSnapshot));
+    }
 
     #pragma omp parallel for
     for(i = 0; i < PartManager->NumPart; i++)	/* initialize sph_properties */
@@ -169,7 +193,8 @@ inttime_t init(int RestartSnapNum, const char * OutputDir, struct header_data * 
             SPHP(i).Density = -1;
             SPHP(i).EgyWtDensity = -1;
             SPHP(i).DhsmlEgyDensityFactor = -1;
-            SPHP(i).Entropy = -1;
+            if (CP->ComovingIntegrationOn)
+                SPHP(i).Entropy = -1;
             SPHP(i).Ne = 1.0;
             SPHP(i).DivVel = 0;
             SPHP(i).CurlVel = 0;
@@ -362,7 +387,13 @@ void check_smoothing_length(struct part_manager_type * PartManager, double * Mea
  * This also allows us to increase MinEgySpec on a restart if we choose.*/
 void check_density_entropy(Cosmology * CP, const double MinEgySpec, const double atime)
 {
-    const double a3 = pow(atime, 3);
+    double a3;
+    if (CP->ComovingIntegrationOn){
+        a3 = pow(atime, 3);
+    }
+    else {
+        a3 = 1.;
+    }
     int i;
     int bad = 0;
     double meanbar = CP->OmegaBaryon * 3 * HUBBLE * CP->HubbleParam * HUBBLE * CP->HubbleParam/ (8 * M_PI * GRAVITY);
@@ -459,13 +490,25 @@ void
 setup_smoothinglengths(int RestartSnapNum, DomainDecomp * ddecomp, Cosmology * CP, int BlackHoleOn, double MinEgySpec, double uu_in_cgs, const inttime_t Ti_Current, const double atime, const int64_t NTotGasInit)
 {
     int i;
-    const double a3 = pow(atime, 3);
+    double a3;
+    if (CP->ComovingIntegrationOn){
+        a3 = pow(atime, 3);
+    }
+    else {
+        a3 = 1.;
+    }
 
     if(RestartSnapNum >= 0)
         return;
 
-    if(InitParams.InitGasTemp < 0)
-        InitParams.InitGasTemp = CP->CMBTemperature / atime;
+    if(InitParams.InitGasTemp < 0) {
+        if (CP->ComovingIntegrationOn) {
+            InitParams.InitGasTemp = CP->CMBTemperature / atime;
+        }
+        else {
+            InitParams.InitGasTemp = CP->CMBTemperature;
+        }
+    }
 
     const double MeanGasSeparation = PartManager->BoxSize / pow(NTotGasInit, 1.0 / 3);
 

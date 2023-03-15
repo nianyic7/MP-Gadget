@@ -171,8 +171,24 @@ petaio_save_snapshot(const char * fname, struct IOTable * IOTable, int verbose, 
     sumup_large_ints(6, ptype_count, NTotal);
 
     struct conversions conv = {0};
-    conv.atime = atime;
-    conv.hubble = hubble_function(CP, atime);
+    // Non-Comoving Integration Note:
+    // atime = loga when passed into this function!
+    // This is because it needs to be written into the header
+
+    if (CP->ComovingIntegrationOn) {
+        conv.atime = atime;
+        conv.ComovingIntegrationOn = 1;
+    }
+    else {
+        conv.atime = 1.0;
+        conv.ComovingIntegrationOn = 0;
+    }
+
+    conv.hubble = hubble_function(CP, conv.atime);
+
+
+    // Note: this atime remains log(a)
+
 
     petaio_write_header(&bf, atime, NTotal, CP, &Header);
 
@@ -279,14 +295,23 @@ petaio_read_snapshot(int num, const char * OutputDir, Cosmology * CP, struct hea
     }
 
     struct conversions conv = {0};
-    conv.atime = header->TimeSnapshot;
-    conv.hubble = hubble_function(CP, header->TimeSnapshot);
+
+    if (CP->ComovingIntegrationOn) {
+        conv.atime = header->TimeSnapshot;
+        conv.hubble = hubble_function(CP, header->TimeSnapshot);
+        conv.ComovingIntegrationOn = 1;
+    }
+    else {
+        conv.atime = 1.0;
+        conv.hubble = hubble_function(CP, 1.0);
+        conv.ComovingIntegrationOn = 0;
+    }
 
     struct IOTable IOTable[1] = {0};
     /* Always try to read the metal tables.
      * This lets us turn it off for a short period and then re-enable it.
      * Note the metal fields are non-fatal so this does not break resuming without metals.*/
-    register_io_blocks(IOTable, 0, 1);
+    register_io_blocks(IOTable, 0, 1, CP->ComovingIntegrationOn);
 
     for(i = 0; i < IOTable->used; i ++) {
         /* only process the particle blocks */
@@ -369,7 +394,7 @@ static void petaio_write_header(BigFile * bf, const double atime, const int64_t 
 
     /* conversion from peculiar velocity to RSD */
     const double hubble = hubble_function(CP, atime);
-    double RSD = 1.0 / (atime * hubble);
+    double RSD = (CP->ComovingIntegrationOn) ? (1.0 / (atime * hubble)) : (1.0/CP->Hubble);
 
     if(!IO.UsePeculiarVelocity) {
         RSD /= atime; /* Conversion from internal velocity to RSD */
@@ -688,10 +713,17 @@ static void GTPosition(int i, double * out, void * baseptr, void * smanptr, cons
     /* Remove the particle offset before saving*/
     struct particle_data * part = (struct particle_data *) baseptr;
     int d;
-    for(d = 0; d < 3; d ++) {
-        out[d] = part[i].Pos[d] - PartManager->CurrentParticleOffset[d];
-        while(out[d] > PartManager->BoxSize) out[d] -= PartManager->BoxSize;
-        while(out[d] <= 0) out[d] += PartManager->BoxSize;
+    if (PartManager->NonPeriodic) {
+        for(d = 0; d < 3; d ++) {
+            out[d] = part[i].Pos[d] - PartManager->CurrentParticleOffset[d];
+        }
+    }
+    else {
+        for(d = 0; d < 3; d ++) {
+            out[d] = part[i].Pos[d] - PartManager->CurrentParticleOffset[d];
+            while(out[d] > PartManager->BoxSize) out[d] -= PartManager->BoxSize;
+            while(out[d] <= 0) out[d] += PartManager->BoxSize;
+        }
     }
 }
 
@@ -747,10 +779,11 @@ static void GTVelocity(int i, float * out, void * baseptr, void * smanptr, const
     /* Convert to Peculiar Velocity if UsePeculiarVelocity is set */
     double fac;
     struct particle_data * part = (struct particle_data *) baseptr;
-    if (IO.UsePeculiarVelocity) {
-        fac = 1.0 / params->atime;
-    } else {
+    if ((!params->ComovingIntegrationOn) || (!IO.UsePeculiarVelocity)) {
         fac = 1.0;
+    }
+    else {
+        fac = 1.0 / params->atime;
     }
 
     int d;
@@ -761,10 +794,11 @@ static void GTVelocity(int i, float * out, void * baseptr, void * smanptr, const
 static void STVelocity(int i, float * out, void * baseptr, void * smanptr, const struct conversions * params) {
     double fac;
     struct particle_data * part = (struct particle_data *) baseptr;
-    if (IO.UsePeculiarVelocity) {
-        fac = params->atime;
-    } else {
+    if ((!params->ComovingIntegrationOn) || (!IO.UsePeculiarVelocity)) {
         fac = 1.0;
+    }
+    else {
+        fac = params->atime;
     }
 
     int d;
@@ -916,7 +950,7 @@ static int order_by_type(const void *a, const void *b)
     return 0;
 }
 
-void register_io_blocks(struct IOTable * IOTable, int WriteGroupID, int MetalReturnOn)
+void register_io_blocks(struct IOTable * IOTable, int WriteGroupID, int MetalReturnOn, int ComovingIntegrationOn)
 {
     int i;
     IOTable->used = 0;
@@ -956,8 +990,10 @@ void register_io_blocks(struct IOTable * IOTable, int WriteGroupID, int MetalRet
     IO_REG(InternalEnergy,   "f4", 1, 0, IOTable);
 
     /* Cooling */
-    IO_REG(ElectronAbundance,       "f4", 1, 0, IOTable);
-    IO_REG_WRONLY(NeutralHydrogenFraction, "f4", 1, 0, IOTable);
+    if (ComovingIntegrationOn) {
+    	IO_REG(ElectronAbundance,       "f4", 1, 0, IOTable);
+    	IO_REG_WRONLY(NeutralHydrogenFraction, "f4", 1, 0, IOTable);
+    }
 
     if(IO.OutputHeliumFractions) {
         IO_REG_WRONLY(HeliumIFraction, "f4", 1, 0, IOTable);
@@ -986,16 +1022,31 @@ void register_io_blocks(struct IOTable * IOTable, int WriteGroupID, int MetalRet
     /* end SF */
 
     /* Black hole */
-    IO_REG_TYPE(StarFormationTime, "f4", 1, 5, IOTable);
-    IO_REG(BlackholeMass,          "f4", 1, 5, IOTable);
-    IO_REG(BlackholeDensity,          "f4", 1, 5, IOTable);
-    IO_REG(BlackholeAccretionRate, "f4", 1, 5, IOTable);
-    IO_REG(BlackholeProgenitors,   "i4", 1, 5, IOTable);
-    IO_REG(BlackholeMinPotPos, "f8", 3, 5, IOTable);
-    IO_REG(BlackholeJumpToMinPot,   "i4", 1, 5, IOTable);
-    IO_REG(BlackholeMtrack,         "f4", 1, 5, IOTable);
-    IO_REG_NONFATAL(BlackholeMseed,         "f4", 1, 5, IOTable);
-    IO_REG_NONFATAL(BlackholeKineticFdbkEnergy, "f4", 1, 5, IOTable);
+    if(ComovingIntegrationOn) {
+        IO_REG_TYPE(StarFormationTime, "f4", 1, 5, IOTable);
+        IO_REG(BlackholeMass,          "f4", 1, 5, IOTable);
+        IO_REG(BlackholeDensity,          "f4", 1, 5, IOTable);
+        IO_REG(BlackholeAccretionRate, "f4", 1, 5, IOTable);
+        IO_REG(BlackholeProgenitors,   "i4", 1, 5, IOTable);
+        IO_REG(BlackholeMinPotPos, "f8", 3, 5, IOTable);
+        IO_REG(BlackholeJumpToMinPot,   "i4", 1, 5, IOTable);
+        IO_REG(BlackholeMtrack,         "f4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeMseed,         "f4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeKineticFdbkEnergy, "f4", 1, 5, IOTable);
+    }
+
+    else{
+        IO_REG_TYPE(StarFormationTime, "f4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeMass,          "f4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeDensity,          "f4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeAccretionRate, "f4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeProgenitors,   "i4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeMinPotPos, "f8", 3, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeJumpToMinPot,   "i4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeMtrack,         "f4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeMseed,         "f4", 1, 5, IOTable);
+        IO_REG_NONFATAL(BlackholeKineticFdbkEnergy, "f4", 1, 5, IOTable);
+    }
 
     /* Smoothing lengths for black hole: this is a new addition*/
     IO_REG_NONFATAL(SmoothingLength,  "f4", 1, 5, IOTable);
