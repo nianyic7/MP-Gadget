@@ -58,6 +58,8 @@ struct GravShortPriv {
     int CalcPotential;
     /* (Optional) pointer to the place to store accelerations, if it is not P->GravAccel*/
     MyFloat (*Accel)[3];
+    /* whether we use periodic wrapping for gravity*/
+    int NonPeriodic;
 };
 
 #define GRAV_GET_PRIV(tw) ((struct GravShortPriv *) ((tw)->priv))

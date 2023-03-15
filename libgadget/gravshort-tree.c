@@ -110,6 +110,7 @@ grav_short_tree(const ActiveParticles * act, PetaPM * pm, ForceTree * tree, MyFl
     priv.G = pm->G;
     priv.cbrtrho0 = pow(rho0, 1.0 / 3);
     priv.Ti_Current = Ti_Current;
+    priv.NonPeriodic = pm->NonPeriodic;
     /* We only want to calculate the potential
      * if it is the true potential from all particles*/
     if(tree->NumParticles == PartManager->NumPart)
@@ -206,7 +207,7 @@ apply_accn_to_output(TreeWalkResultGravShort * output, const double dx[3], const
  * to the acceleration. This happens if the node is further away than the short-range force cutoff.
  * Return 1 if the node should be discarded, 0 otherwise. */
 static int
-shall_we_discard_node(const double len, const double r2, const double center[3], const double inpos[3], const double BoxSize, const double rcut, const double rcut2)
+shall_we_discard_node(const double len, const double r2, const double center[3], const double inpos[3], const double BoxSize, const double rcut, const double rcut2, const int NonPeriodic)
 {
     /* This checks the distance from the node center of mass
      * is greater than the cutoff. */
@@ -217,9 +218,14 @@ shall_we_discard_node(const double len, const double r2, const double center[3],
         int i;
         /*This checks whether we are also outside this region of the oct-tree*/
         /* As long as one dimension is outside, we are fine*/
-        for(i=0; i < 3; i++)
-            if(fabs(NEAREST(center[i] - inpos[i], BoxSize)) > eff_dist)
+        for(i=0; i < 3; i++) {
+            if ((NonPeriodic) && (fabs(center[i] - inpos[i]) > eff_dist)) {
                 return 1;
+            }
+            else if (fabs(NEAREST(center[i] - inpos[i], BoxSize)) > eff_dist) {
+                return 1;
+            }
+        }
     }
     return 0;
 }
@@ -228,7 +234,7 @@ shall_we_discard_node(const double len, const double r2, const double center[3],
  * If it should be discarded, 0 is returned.
  * If it should be used, 1 is returned, otherwise zero is returned. */
 static int
-shall_we_open_node(const double len, const double mass, const double r2, const double center[3], const double inpos[3], const double BoxSize, const double aold, const int TreeUseBH, const double BHOpeningAngle2)
+shall_we_open_node(const double len, const double mass, const double r2, const double center[3], const double inpos[3], const double BoxSize, const double aold, const int TreeUseBH, const double BHOpeningAngle2, const int NonPeriodic)
 {
     /* Check the relative acceleration opening condition*/
     if((TreeUseBH == 0) && (mass * len * len > r2 * r2 * aold))
@@ -239,7 +245,13 @@ shall_we_open_node(const double len, const double mass, const double r2, const d
 
     const double inside = 0.6 * len;
     /* Open the cell if we are inside it, even if the opening criterion is not satisfied.*/
-    if(fabs(NEAREST(center[0] - inpos[0], BoxSize)) < inside &&
+    if (NonPeriodic) {
+        if (fabs(center[0] - inpos[0]) < inside &&
+            fabs(center[1] - inpos[1]) < inside &&
+            fabs(center[2] - inpos[2]) < inside)
+            return 1;
+    }
+    else if (fabs(NEAREST(center[0] - inpos[0], BoxSize)) < inside &&
         fabs(NEAREST(center[1] - inpos[1], BoxSize)) < inside &&
         fabs(NEAREST(center[2] - inpos[2], BoxSize)) < inside)
         return 1;
@@ -274,6 +286,7 @@ int force_treeev_shortrange(TreeWalkQueryGravShort * input,
     const double BHOpeningAngle2 = GRAV_GET_PRIV(lv->tw)->BHOpeningAngle * GRAV_GET_PRIV(lv->tw)->BHOpeningAngle;
     const int NeutrinoTracer = GRAV_GET_PRIV(lv->tw)->NeutrinoTracer;
     const int FastParticleType = GRAV_GET_PRIV(lv->tw)->FastParticleType;
+    const int NonPeriodic = GRAV_GET_PRIV(lv->tw)->NonPeriodic;
 
     /*Input particle data*/
     const double * inpos = input->base.Pos;
@@ -308,12 +321,18 @@ int force_treeev_shortrange(TreeWalkQueryGravShort * input,
 
             int i;
             double dx[3];
-            for(i = 0; i < 3; i++)
-                dx[i] = NEAREST(nop->mom.cofm[i] - inpos[i], BoxSize);
+            for(i = 0; i < 3; i++) {
+                if (NonPeriodic) {
+                        dx[i] = nop->mom.cofm[i] - inpos[i];
+                    }
+                else {
+                    dx[i] = NEAREST(nop->mom.cofm[i] - inpos[i], BoxSize);
+                }
+            }
             const double r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
 
             /* Discard this node, move to sibling*/
-            if(shall_we_discard_node(nop->len, r2, nop->center, inpos, BoxSize, rcut, rcut2))
+            if(shall_we_discard_node(nop->len, r2, nop->center, inpos, BoxSize, rcut, rcut2, NonPeriodic))
             {
                 no = nop->sibling;
                 /* Don't add this node*/
@@ -321,7 +340,7 @@ int force_treeev_shortrange(TreeWalkQueryGravShort * input,
             }
 
             /* This node accelerates the particle directly, and is not opened.*/
-            int open_node = shall_we_open_node(nop->len, nop->mom.mass, r2, nop->center, inpos, BoxSize, aold, TreeUseBH, BHOpeningAngle2);
+            int open_node = shall_we_open_node(nop->len, nop->mom.mass, r2, nop->center, inpos, BoxSize, aold, TreeUseBH, BHOpeningAngle2, NonPeriodic);
             if(TreeParams.AdaptiveSoftening == 1 && (input->Soft < nop->mom.hmax))
             {
                 /* Always open the node if it has a larger softening than the particle,
@@ -381,8 +400,14 @@ int force_treeev_shortrange(TreeWalkQueryGravShort * input,
 
             double dx[3];
             int j;
-            for(j = 0; j < 3; j++)
-                dx[j] = NEAREST(P[pp].Pos[j] - inpos[j], BoxSize);
+            for(j = 0; j < 3; j++) {
+                if (NonPeriodic) {
+                    dx[j] = P[pp].Pos[j] - inpos[j];
+                }
+                else {
+                    dx[j] = NEAREST(P[pp].Pos[j] - inpos[j], BoxSize);
+                }
+            }
             const double r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
 
             /* This is always the Newtonian softening,

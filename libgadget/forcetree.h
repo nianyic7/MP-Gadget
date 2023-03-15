@@ -107,6 +107,7 @@ typedef struct ForceTree {
     int nfather;
     /*!< Store the size of the box used to build the tree, for periodic walking.*/
     double BoxSize;
+    int NonPeriodic;
 } ForceTree;
 
 /*Initialize the internal parameters of the forcetree module*/
