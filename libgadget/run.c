@@ -35,6 +35,7 @@
 #include "uvbg.h"
 #include "neutrinos_lra.h"
 #include "stats.h"
+#include "veldisp.h"
 
 static struct ClockTable Clocks;
 
