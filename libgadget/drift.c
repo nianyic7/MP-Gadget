@@ -19,7 +19,7 @@
  * receives a shift vector removing the previous random shift and adding a new one.
  * This function also updates the velocity and updates the density according to an adiabatic factor.
  */
-void real_drift_particle(struct particle_data * pp, struct slots_manager_type * sman, const double ddrift, const double BoxSize, const double random_shift[3])
+void real_drift_particle(struct particle_data * pp, struct slots_manager_type * sman, const double ddrift, const double BoxSize, const double random_shift[3], const int NonPeriodic)
 {
     int j;
     if(pp->IsGarbage || pp->Swallowed) {
@@ -27,8 +27,10 @@ void real_drift_particle(struct particle_data * pp, struct slots_manager_type * 
          * physical position of swallowed particles remains unchanged.*/
         for(j = 0; j < 3; j++) {
             pp->Pos[j] += random_shift[j];
-            while(pp->Pos[j] > BoxSize) pp->Pos[j] -= BoxSize;
-            while(pp->Pos[j] <= 0) pp->Pos[j] += BoxSize;
+            if (!NonPeriodic) {
+                while(pp->Pos[j] > BoxSize) pp->Pos[j] -= BoxSize;
+                while(pp->Pos[j] <= 0) pp->Pos[j] += BoxSize;
+            }
         }
         /* Swallowed particles still need a peano key.*/
         if(pp->Swallowed)
@@ -40,10 +42,16 @@ void real_drift_particle(struct particle_data * pp, struct slots_manager_type * 
     if(BHGetRepositionEnabled() && pp->Type == 5) {
         int k;
         int pi = pp->PI;
+        double dx;
         struct bh_particle_data * BH = (struct bh_particle_data *) sman->info[5].ptr;
         if (BH[pi].JumpToMinPot) {
             for(k = 0; k < 3; k++) {
-                double dx = NEAREST(pp->Pos[k] - BH[pi].MinPotPos[k], BoxSize);
+                if (NonPeriodic) {
+                    dx = pp->Pos[k] - BH[pi].MinPotPos[k];
+                }
+                else {
+                    dx = NEAREST(pp->Pos[k] - BH[pi].MinPotPos[k], BoxSize);
+                }
                 if(dx > 0.1 * BoxSize) {
                     endrun(1, "Drifting blackhole very far, from %g %g %g to %g %g %g id = %ld. Likely due to the time step is too sparse.\n",
                         pp->Pos[0],
@@ -74,15 +82,24 @@ void real_drift_particle(struct particle_data * pp, struct slots_manager_type * 
         if(pp->Hsml > Maxhsml)
             pp->Hsml = Maxhsml;
     }
-
-    for(j = 0; j < 3; j++) {
-        pp->Pos[j] += pp->Vel[j] * ddrift + random_shift[j];
+    
+    if (! NonPeriodic) {
+        for(j = 0; j < 3; j++) {
+            pp->Pos[j] += pp->Vel[j] * ddrift + random_shift[j];
+        }
+        
+        for(j = 0; j < 3; j ++) {
+            while(pp->Pos[j] > BoxSize) pp->Pos[j] -= BoxSize;
+            while(pp->Pos[j] <= 0) pp->Pos[j] += BoxSize;
+        }
+    }
+    else {
+        /* add the non-random shift to keep the particle centered   */
+        for(j = 0; j < 3; j++) {
+            pp->Pos[j] += pp->Vel[j] * ddrift + random_shift[j];
+        }
     }
 
-    for(j = 0; j < 3; j ++) {
-        while(pp->Pos[j] > BoxSize) pp->Pos[j] -= BoxSize;
-        while(pp->Pos[j] <= 0) pp->Pos[j] += BoxSize;
-    }
     /* avoid recomputing them during layout and force tree build.*/
     pp->Key = PEANO(pp->Pos, BoxSize);
 }
@@ -103,9 +120,30 @@ void drift_all_particles(inttime_t ti0, inttime_t ti1, Cosmology * CP, const dou
         if(PartManager->Base[i].Ti_drift != ti0)
             endrun(10, "Drift time mismatch: (ids = %ld %ld) %d != %d\n",PartManager->Base[0].ID, PartManager->Base[i].ID, ti0,  PartManager->Base[i].Ti_drift);
 #endif
-        real_drift_particle(&PartManager->Base[i], SlotsManager, ddrift, PartManager->BoxSize, random_shift);
+        real_drift_particle(&PartManager->Base[i], SlotsManager, ddrift, PartManager->BoxSize, random_shift, CP->NonPeriodic);
         PartManager->Base[i].Ti_drift = ti1;
     }
+    
+    /******************* For debugging OOB ***************************/
+    double Xmin[3] = {1.0e30, 1.0e30, 1.0e30};
+    double Xmax[3] = {-1.0e30, -1.0e30, -1.0e30};
+
+
+    for(i = 0; i < PartManager->NumPart; i++) {
+        for (int k=0; k < 3; k++) {
+            Xmin[k] = (Xmin[k] < P[i].Pos[k]) ? Xmin[k] : P[i].Pos[k];
+            Xmax[k] = (Xmax[k] > P[i].Pos[k]) ? Xmax[k] : P[i].Pos[k];
+        } 
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, Xmin, 3, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, Xmax, 3, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
+    message(0, "**** check Xmin/Xmax inside drift \n****");
+    message(0, "***** Xmin=(%g, %g, %g)  **** \n", Xmin[0], Xmin[1], Xmin[2]); 
+    message(0, "***** Xmax=(%g, %g, %g)  **** \n", Xmax[0], Xmax[1], Xmax[2]); 
+/****************************************************/
 
     walltime_measure("/Drift/All");
 }
