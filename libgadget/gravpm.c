@@ -91,7 +91,10 @@ gravpm_force(PetaPM * pm, ForceTree * tree, Cosmology * CP, double Time, double 
 
     if(CP->HybridNeutrinosOn && particle_nu_fraction(&(CP->ONu.hybnu), Time, 0) == 0.)
         pstruct.active = &hybrid_nu_gravpm_is_active;
-
+        
+/******************* For debugging OOB ***************************/
+    double Xmin[3] = {1.0e30, 1.0e30, 1.0e30};
+    double Xmax[3] = {-1.0e30, -1.0e30, -1.0e30};
     int i;
 
     for(i = 0; i < PartManager->NumPart; i++) {

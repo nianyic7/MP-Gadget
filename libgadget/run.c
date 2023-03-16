@@ -683,7 +683,9 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             }
 
             if(is_PM && All.CoolingOn)
-                winds_find_vel_disp(&Act, atime, hubble_function(&All.CP, atime), &All.CP, &times, ddecomp);
+                // Non-ComovingIntegration Note: use afac here;
+                // the atime in hubble_func does not matter because it is determined by CP.ComovingIntegrationOn
+                winds_find_vel_disp(&Act, afac, hubble_function(&All.CP, atime), &All.CP, &times, ddecomp);
             /* Note that the tree here may be freed, if we are not a gravity-active timestep,
              * or if we are a PM step.*/
             /* If we didn't build a tree for gravity, we need to build one in BH or in winds.
@@ -716,6 +718,11 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             WriteSnapshot |= action->write_snapshot;
             WriteFOF |= action->write_fof;
         }
+        //NYC: FOF not enabled for Non-ComovingIntegration
+        if (All.CP.ComovingIntegrationOn) {
+            WriteFOF = 0;
+        }
+        
         if(WriteSnapshot || WriteFOF) {
             /* Get a new snapshot*/
             SnapshotFileCount++;
@@ -725,11 +732,8 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             if(slots_gc(compact, PartManager, SlotsManager))
                 Act.NumActiveParticle = PartManager->NumPart;
         }
-        FOFGroups fof = {0
-        //NYC: FOF not enabled for Non-ComovingIntegration
-        if (All.CP.ComovingIntegrationOn) {
-            WriteFOF = 0;
-        }
+        FOFGroups fof = {0};
+
         if(WriteFOF) {
             /* Compute FOF and assign GrNr so it can be written in checkpoint.*/
             fof = fof_fof(ddecomp, 1, MPI_COMM_WORLD);

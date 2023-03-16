@@ -271,6 +271,7 @@ blackhole(const ActiveParticles * act, double atime, Cosmology * CP, ForceTree *
     /*************************************************************************/
     /*  Dynamical Friction Treewalk */
     /*************************************************************************/
+    // Non-ComovingIntegration Note: atime=afac=1 when passed into this function
     struct BHDynFricPriv dynpriv[1];
     dynpriv->atime = atime;
     dynpriv->CP = CP;

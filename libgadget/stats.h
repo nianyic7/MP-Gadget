@@ -12,6 +12,7 @@ struct OutputFD
     FILE *FdBlackHoles;  /*!< file handle for blackholes.txt log-file. */
     FILE *FdBlackholeDetails;  /*!< file handle for BlackholeDetails binary file. */
     FILE *FdHelium; /* < file handle for the Helium reionization log file helium.txt */
+    FILE *FdBlackHoleDynamics; /* < file handle for the blackhole dynamics file */
 };
 
 void set_stats_params(ParameterSet * ps);
