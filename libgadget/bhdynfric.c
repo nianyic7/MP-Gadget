@@ -11,6 +11,12 @@ static struct BlackholeDynFricParams
     double BH_DFbmax; /* the maximum impact range, in physical unit of kpc. */
 } blackhole_dynfric_params;
 
+/* For the wind hsml loop*/
+#define NHSML 5 /* Number of densities to evaluate for wind weight ngbiter*/
+#define NUMNGB 1024 /*Number of DM+star ngb to evaluate DF */
+#define MAXDMDEVIATION 2
+
+
 /*Set the parameters of the BH module*/
 void set_blackhole_dynfric_params(ParameterSet * ps)
 {
