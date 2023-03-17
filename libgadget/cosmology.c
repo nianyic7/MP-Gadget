@@ -14,7 +14,11 @@ static inline double OmegaFLD(const Cosmology * CP, const double a);
 
 void init_cosmology(Cosmology * CP, const double TimeBegin, const struct UnitSystem units)
 {
-    CP->Hubble = HUBBLE * units.UnitTime_in_s;
+    if (CP->ComovingIntegrationOn)
+        CP->Hubble = HUBBLE * units.UnitTime_in_s;
+    else
+        CP->Hubble = units.UnitTime_in_s;
+    
     CP->UnitTime_in_s = units.UnitTime_in_s;
     CP->GravInternal = GRAVITY / pow(units.UnitLength_in_cm, 3) * units.UnitMass_in_g * pow(units.UnitTime_in_s, 2);
 
@@ -60,7 +64,7 @@ int hybrid_nu_tracer(const Cosmology * CP, double atime)
 double hubble_function(const Cosmology * CP, double a)
 {
     if (!CP->ComovingIntegrationOn) {
-        return 1.0;
+        return CP->Hubble;
     }
 
     double hubble_a;
