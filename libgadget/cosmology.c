@@ -14,11 +14,8 @@ static inline double OmegaFLD(const Cosmology * CP, const double a);
 
 void init_cosmology(Cosmology * CP, const double TimeBegin, const struct UnitSystem units)
 {
-    if (CP->ComovingIntegrationOn)
-        CP->Hubble = HUBBLE * units.UnitTime_in_s;
-    else
-        CP->Hubble = units.UnitTime_in_s;
-    
+
+    CP->Hubble = HUBBLE * units.UnitTime_in_s;
     CP->UnitTime_in_s = units.UnitTime_in_s;
     CP->GravInternal = GRAVITY / pow(units.UnitLength_in_cm, 3) * units.UnitMass_in_g * pow(units.UnitTime_in_s, 2);
 
