@@ -193,7 +193,7 @@ void write_cpu_log(int NumCurrentTiStep, const double atime, FILE * FdCPU, doubl
  * actually used (e.g. momentum is not really used anywhere),
  * just the energies are written to a log-file every once in a while.
  */
-struct state_of_system compute_global_quantities_of_system(const double Time,  struct part_manager_type * PartManager)
+struct state_of_system compute_global_quantities_of_system(const double Time,  double redshift, struct part_manager_type * PartManager)
 {
     int i, j;
     struct state_of_system sys;
@@ -205,7 +205,7 @@ struct state_of_system compute_global_quantities_of_system(const double Time,  s
     a2 = Time * Time;
     a3 = Time * Time * Time;
 
-    double redshift = 1. / Time - 1;
+//    double redshift = 1. / Time - 1;
     memset(&sys, 0, sizeof(sys));
     struct UVBG GlobalUVBG = get_global_UVBG(redshift);
 
@@ -348,12 +348,12 @@ struct state_of_system compute_global_quantities_of_system(const double Time,  s
  * statistics about the energies in the various particle components to
  * the file FdEnergy.
  */
-void energy_statistics(FILE * FdEnergy, const double Time, struct part_manager_type * PartManager)
+void energy_statistics(FILE * FdEnergy, const double Time, double redshift, struct part_manager_type * PartManager)
 {
     if(!FdEnergy)
         return;
 
-    struct state_of_system SysState = compute_global_quantities_of_system(Time, PartManager);
+    struct state_of_system SysState = compute_global_quantities_of_system(Time, redshift, PartManager);
 
     message(0, "Time %g Mean Temperature of Gas %g\n",
                 Time, SysState.TemperatureComp[0]);

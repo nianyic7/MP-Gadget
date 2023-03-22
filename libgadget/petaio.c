@@ -178,10 +178,12 @@ petaio_save_snapshot(const char * fname, struct IOTable * IOTable, int verbose, 
     if (CP->ComovingIntegrationOn) {
         conv.atime = atime;
         conv.ComovingIntegrationOn = 1;
+        conv.redshift = 1.0/atime - 1.0;
     }
     else {
         conv.atime = 1.0;
         conv.ComovingIntegrationOn = 0;
+        conv.redshift = CP->Redshift;
     }
 
     conv.hubble = hubble_function(CP, conv.atime);
@@ -864,37 +866,37 @@ static void GTBlackholeMinPotPos(int i, double * out, void * baseptr, void * sma
 /*This is only used if FoF is enabled*/
 SIMPLE_GETTER(GTGroupID, GrNr, uint32_t, 1, struct particle_data)
 static void GTNeutralHydrogenFraction(int i, float * out, void * baseptr, void * smanptr, const struct conversions * params) {
-    double redshift = 1./params->atime - 1;
+    double redshift = params->redshift;
     struct particle_data * pl = ((struct particle_data *) baseptr)+i;
     int PI = pl->PI;
     struct slot_info * info = &(((struct slots_manager_type *) smanptr)->info[0]);
     struct sph_particle_data * sl = (struct sph_particle_data *) info->ptr;
-    *out = get_neutral_fraction_sfreff(redshift, params->hubble, pl, sl+PI);
+    *out = get_neutral_fraction_sfreff(redshift, params->hubble, params->ComovingIntegrationOn, pl, sl+PI);
 }
 
 static void GTHeliumIFraction(int i, float * out, void * baseptr, void * smanptr, const struct conversions * params) {
-    double redshift = 1./params->atime - 1;
+    double redshift = params->redshift;
     struct particle_data * pl = ((struct particle_data *) baseptr)+i;
     int PI = pl->PI;
     struct slot_info * info = &(((struct slots_manager_type *) smanptr)->info[0]);
     struct sph_particle_data * sl = (struct sph_particle_data *) info->ptr;
-    *out = get_helium_neutral_fraction_sfreff(0, redshift, params->hubble, pl, sl+PI);
+    *out = get_helium_neutral_fraction_sfreff(0, redshift, params->hubble, params->ComovingIntegrationOn, pl, sl+PI);
 }
 static void GTHeliumIIFraction(int i, float * out, void * baseptr, void * smanptr, const struct conversions * params) {
-    double redshift = 1./params->atime - 1;
+    double redshift = params->redshift;
     struct particle_data * pl = ((struct particle_data *) baseptr)+i;
     int PI = pl->PI;
     struct slot_info * info = &(((struct slots_manager_type *) smanptr)->info[0]);
     struct sph_particle_data * sl = (struct sph_particle_data *) info->ptr;
-    *out = get_helium_neutral_fraction_sfreff(1, redshift, params->hubble, pl, sl+PI);
+    *out = get_helium_neutral_fraction_sfreff(1, redshift, params->hubble, params->ComovingIntegrationOn, pl, sl+PI);
 }
 static void GTHeliumIIIFraction(int i, float * out, void * baseptr, void * smanptr, const struct conversions * params) {
-    double redshift = 1./params->atime - 1;
+    double redshift = params->redshift;
     struct particle_data * pl = ((struct particle_data *) baseptr)+i;
     int PI = pl->PI;
     struct slot_info * info = &(((struct slots_manager_type *) smanptr)->info[0]);
     struct sph_particle_data * sl = (struct sph_particle_data *) info->ptr;
-    *out = get_helium_neutral_fraction_sfreff(2, redshift, params->hubble, pl, sl+PI);
+    *out = get_helium_neutral_fraction_sfreff(2, redshift, params->hubble, params->ComovingIntegrationOn, pl, sl+PI);
 }
 static void GTInternalEnergy(int i, float * out, void * baseptr, void * smanptr, const struct conversions * params) {
     int PI = ((struct particle_data *) baseptr)[i].PI;

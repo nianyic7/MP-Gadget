@@ -125,7 +125,7 @@ static int starformation(int i, double *localsfr, MyFloat * sm_out, MyFloat * Gr
 static int quicklyastarformation(int i, const double a3inv);
 static double get_sfr_factor_due_to_selfgravity(int i, const double atime, const double a3inv, const double hubble, const double GravInternal);
 static double get_sfr_factor_due_to_h2(int i, MyFloat * GradRho_mag, const double atime);
-static double get_starformation_rate_full(int i, MyFloat * GradRho, struct sfr_eeqos_data sfr_data, const double atime, const double a3inv, const double hubble, const double GravInternal);
+static double get_starformation_rate_full(int i, MyFloat * GradRho, struct sfr_eeqos_data sfr_data, const double atime, const double a3inv, const double hubble, const double redshift, const double GravInternal);
 static double get_egyeff(double redshift, double dens, struct UVBG * uvbg);
 static double find_star_mass(int i, const double avg_baryon_mass);
 /*Get enough memory for new star slots. This may be excessively slow! Don't do it too often.*/
@@ -224,7 +224,7 @@ cooling_and_starformation(ActiveParticles * act, double Time, double dloga, Forc
         redshift = 1./Time - 1;
     }
     else {
-        redshift = 0.;
+        redshift = CP->Redshift;
     }
     struct UVBG GlobalUVBG = get_global_UVBG(redshift);
     double sum_sm = 0, sum_mass_stars = 0, localsfr = 0;
@@ -253,7 +253,7 @@ cooling_and_starformation(ActiveParticles * act, double Time, double dloga, Forc
                 if(sfr_params.QuickLymanAlphaProbability > 0)
                     shall_we_star_form = quicklyastarformation(p_i, a3inv);
                 else
-                    shall_we_star_form = sfreff_on_eeqos(&SPHP(p_i), a3inv);
+                    shall_we_star_form = sfreff_on_eeqos(&SPHP(p_i), a3inv, redshift);
             }
 
             if(shall_we_star_form) {
@@ -527,7 +527,7 @@ sfr_density_threshold(const double atime)
  * cooling via the relaxation equation and maybe forming stars.
  * 0 if the particle does not form stars, instead cooling normally.*/
 int
-sfreff_on_eeqos(const struct sph_particle_data * sph, const double a3inv)
+sfreff_on_eeqos(const struct sph_particle_data * sph, const double a3inv, const double redshift)
 {
     int flag = 0;
     /* no sfr: normal cooling*/
@@ -548,7 +548,7 @@ sfreff_on_eeqos(const struct sph_particle_data * sph, const double a3inv)
      * the effective equation of state (at z=0). This in practice means black hole heated.*/
     if(flag == 1 && sfr_params.BHFeedbackUseTcool == 2) {
         //Redshift is the argument
-        double redshift = cbrt(a3inv)-1;
+//        double redshift = cbrt(a3inv)-1;
         struct UVBG uvbg = get_global_UVBG(redshift);
         double egyeff = get_egyeff(redshift, sph->Density, &uvbg);
         const double enttou = entropy_to_u(sph->Density, a3inv);
@@ -561,10 +561,14 @@ sfreff_on_eeqos(const struct sph_particle_data * sph, const double a3inv)
 }
 
 /*Get the neutral fraction of a particle correctly, accounting for being on the star-forming equation of state*/
-double get_neutral_fraction_sfreff(double redshift, double hubble, struct particle_data * partdata, struct sph_particle_data * sphdata)
+double get_neutral_fraction_sfreff(double redshift, double hubble, int ComovingIntegrationOn, struct particle_data * partdata, struct sph_particle_data * sphdata)
 {
     double nh0;
-    const double a3inv = (1+redshift)*(1+redshift)*(1+redshift);
+    double a3inv;
+    if (ComovingIntegrationOn)
+        a3inv = (1+redshift)*(1+redshift)*(1+redshift);
+    else
+        a3inv = 1.0;
     struct UVBG GlobalUVBG = get_global_UVBG(redshift);
     double localJ21 = 0;
     double zreion = 0;
@@ -575,7 +579,7 @@ double get_neutral_fraction_sfreff(double redshift, double hubble, struct partic
     struct UVBG uvbg = get_local_UVBG(redshift, &GlobalUVBG, partdata->Pos, PartManager->CurrentParticleOffset, localJ21, zreion);
     double physdens = sphdata->Density * a3inv;
 
-    if(sfr_params.QuickLymanAlphaProbability > 0 || !sfreff_on_eeqos(sphdata, a3inv)) {
+    if(sfr_params.QuickLymanAlphaProbability > 0 || !sfreff_on_eeqos(sphdata, a3inv, redshift)) {
         /*This gets the neutral fraction for standard gas*/
         double InternalEnergy = sphdata->Entropy * entropy_to_u(sphdata->Density, a3inv);
         nh0 = GetNeutralFraction(InternalEnergy, physdens, &uvbg, sphdata->Ne);
@@ -594,9 +598,13 @@ double get_neutral_fraction_sfreff(double redshift, double hubble, struct partic
     return nh0;
 }
 
-double get_helium_neutral_fraction_sfreff(int ion, double redshift, double hubble, struct particle_data * partdata, struct sph_particle_data * sphdata)
+double get_helium_neutral_fraction_sfreff(int ion, double redshift, double hubble, int ComovingIntegrationOn, struct particle_data * partdata, struct sph_particle_data * sphdata)
 {
-    const double a3inv = (1+redshift)*(1+redshift)*(1+redshift);
+    double a3inv;
+    if (ComovingIntegrationOn)
+        a3inv = (1+redshift)*(1+redshift)*(1+redshift);
+    else
+        a3inv = 1.0;
     double helium;
     struct UVBG GlobalUVBG = get_global_UVBG(redshift);
     double localJ21 = 0;
@@ -608,7 +616,7 @@ double get_helium_neutral_fraction_sfreff(int ion, double redshift, double hubbl
     struct UVBG uvbg = get_local_UVBG(redshift, &GlobalUVBG, partdata->Pos, PartManager->CurrentParticleOffset, localJ21, zreion);
     double physdens = sphdata->Density * a3inv;
 
-    if(sfr_params.QuickLymanAlphaProbability > 0 || !sfreff_on_eeqos(sphdata, a3inv)) {
+    if(sfr_params.QuickLymanAlphaProbability > 0 || !sfreff_on_eeqos(sphdata, a3inv, redshift)) {
         /*This gets the neutral fraction for standard gas*/
         double InternalEnergy = sphdata->Entropy * entropy_to_u(sphdata->Density, a3inv);
         helium = GetHeliumIonFraction(ion, InternalEnergy, physdens, &uvbg, sphdata->Ne);
@@ -727,7 +735,7 @@ static int
 starformation(int i, double *localsfr, MyFloat * sm_out, MyFloat * GradRho, const double redshift, const double a3inv, const double hubble, const double GravInternal, const struct UVBG * const GlobalUVBG)
 {
     /* Non-ComovingIntegration Note:
-     a3inv=1,redshift=0 (therefore atime=1), hubble=1 (therfore dtime=dloga), and  when passed to this function. */
+     a3inv=1,(therefore atime=1), redshift=CP->redshift, hubble=CP->Hubble (therfore dtime=dloga/CP->Hubble), and  when passed to this function. */
     /* Need to check if get_local_UVBG(redshift) is ok with redshift=0 */
     /*  the proper time-step */
     double dloga = get_dloga_for_bin(P[i].TimeBinHydro, P[i].Ti_drift);
@@ -744,8 +752,8 @@ starformation(int i, double *localsfr, MyFloat * sm_out, MyFloat * GradRho, cons
 
     struct sfr_eeqos_data sfr_data = get_sfr_eeqos(&P[i], &SPHP(i), dtime, &uvbg, redshift, a3inv);
 
-    double atime = 1/(1+redshift);
-    double smr = get_starformation_rate_full(i, GradRho, sfr_data, atime, a3inv, hubble, GravInternal);
+    double atime = cbrt(a3inv);
+    double smr = get_starformation_rate_full(i, GradRho, sfr_data, atime, a3inv, hubble, redshift, GravInternal);
 
     double sm = smr * dtime;
 
@@ -792,7 +800,7 @@ starformation(int i, double *localsfr, MyFloat * sm_out, MyFloat * GradRho, cons
 struct sfr_eeqos_data get_sfr_eeqos(struct particle_data * part, struct sph_particle_data * sph, double dtime, struct UVBG *local_uvbg, const double redshift, const double a3inv)
 {
     /* Non-ComovingIntegration Note:
-     dtime=dloga,a3inv=1,redshift=0 when passed to this function. Need to check if it's save to set redshift=0; otherwise we're good */
+     dtime=dloga,a3inv=1,redshift=CP->Redshift when passed to this function. */
     struct sfr_eeqos_data data;
     /* Initialise data to something, just in case.*/
     data.trelax = sfr_params.MaxSfrTimescale;
@@ -802,7 +810,7 @@ struct sfr_eeqos_data get_sfr_eeqos(struct particle_data * part, struct sph_part
     data.ne = 0;
 
     /* This shall never happen, but just in case*/
-    if(!sfreff_on_eeqos(sph, a3inv))
+    if(!sfreff_on_eeqos(sph, a3inv, redshift))
         return data;
 
     data.ne = sph->Ne;
@@ -828,11 +836,12 @@ struct sfr_eeqos_data get_sfr_eeqos(struct particle_data * part, struct sph_part
     return data;
 }
 
-static double get_starformation_rate_full(int i, MyFloat * GradRho, struct sfr_eeqos_data sfr_data, const double atime, const double a3inv, const double hubble, const double GravInternal)
+static double get_starformation_rate_full(int i, MyFloat * GradRho, struct sfr_eeqos_data sfr_data, const double atime, const double a3inv, const double hubble, const double redshift, const double GravInternal)
 {
     /* Non-ComovingIntegration Note:
      atime,a3inv,hubble are already 1 when passed to this fhunction, and it's consistent with the functions called in here*/
-    if(!sfreff_on_eeqos(&SPHP(i), a3inv)) {
+    
+    if(!sfreff_on_eeqos(&SPHP(i), a3inv, redshift)) {
         return 0;
     }
 

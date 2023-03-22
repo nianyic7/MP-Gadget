@@ -41,6 +41,7 @@ struct conversions
     double atime;
     double hubble;
     int ComovingIntegrationOn;
+    double redshift;
 };
 
 typedef void (*property_getter) (int i, void * result, void * baseptr, void * slotptr, const struct conversions * params);

@@ -664,8 +664,13 @@ blackhole_accretion_ngbiter(TreeWalkQueryBHAccretion * I,
             /* update the feedback weighting */
             double mass_j;
             if(HAS(blackhole_params.BlackHoleFeedbackMethod, BH_FEEDBACK_OPTTHIN)) {
-                double redshift = 1./BH_GET_PRIV(lv->tw)->atime - 1;
-                double nh0 = get_neutral_fraction_sfreff(redshift, BH_GET_PRIV(lv->tw)->hubble, &P[other], &SPHP(other));
+                double redshift;
+                if (BH_GET_PRIV(lv->tw)->CP->ComovingIntegrationOn)
+                    redshift = 1./BH_GET_PRIV(lv->tw)->atime - 1;
+                else
+                    redshift = BH_GET_PRIV(lv->tw)->CP->Redshift;
+                
+                double nh0 = get_neutral_fraction_sfreff(redshift, BH_GET_PRIV(lv->tw)->hubble, BH_GET_PRIV(lv->tw)->CP->ComovingIntegrationOn, &P[other], &SPHP(other));
                 if(r2 > 0)
                     O->FeedbackWeightSum += (P[other].Mass * nh0) / r2;
             } else {
@@ -914,10 +919,15 @@ blackhole_feedback_ngbiter(TreeWalkQueryBHFeedback * I,
         /* thermal feedback */
         if(I->FeedbackEnergy > 0 && I->FdbkChannel == 0){
             const double injected_BH = I->FeedbackEnergy * mass_j * wk / I->FeedbackWeightSum;
+            double redshift;
+            if (BH_GET_PRIV(lv->tw)->CP->ComovingIntegrationOn)
+                redshift = 1./BH_GET_PRIV(lv->tw)->atime - 1;
+            else
+                redshift = BH_GET_PRIV(lv->tw)->CP->Redshift;
             /* Set a flag for star-forming particles:
                 * we want these to cool to the EEQOS via
                 * tcool rather than trelax.*/
-            if(sfreff_on_eeqos(&SPHP(other), BH_GET_PRIV(lv->tw)->a3inv)) {
+            if(sfreff_on_eeqos(&SPHP(other), BH_GET_PRIV(lv->tw)->a3inv, redshift)) {
                 /* We cannot atomically set a bitfield.
                  * This flag is never read in this thread loop, and we are careful not to
                  * do this with a swallowed particle (as this can race with IsGarbage being set).

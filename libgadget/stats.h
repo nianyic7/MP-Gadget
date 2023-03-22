@@ -24,7 +24,7 @@ void close_outputfiles(struct OutputFD *fds);
 void write_cpu_log(int NumCurrentTiStep, const double atime, FILE * FdCPU, double ElapsedTime);
 
 /* Write out overall statistics of the energy of the simulation */
-void energy_statistics(FILE * FdEnergy, const double Time,  struct part_manager_type * PartManager);
+void energy_statistics(FILE * FdEnergy, const double Time,  double redshift, struct part_manager_type * PartManager);
 
 void output_blackhole_dynamics(FILE * FdBlackHoleDynamics, const double Time, struct part_manager_type * PartManager);
 
