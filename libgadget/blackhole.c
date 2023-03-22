@@ -231,7 +231,7 @@ blackholes_active(const ActiveParticles * act, int ** ActiveBlackHoles, int64_t 
 }
 
 void
-blackhole(const ActiveParticles * act, double atime, Cosmology * CP, ForceTree * tree, DomainDecomp * ddecomp, DriftKickTimes * times, const struct UnitSystem units, FILE * FdBlackHoles, FILE * FdBlackholeDetails)
+blackhole(const ActiveParticles * act, double atime, double time, Cosmology * CP, ForceTree * tree, DomainDecomp * ddecomp, DriftKickTimes * times, const struct UnitSystem units, FILE * FdBlackHoles, FILE * FdBlackholeDetails)
 {
     /* Do nothing if no black holes*/
     int64_t totbh;
@@ -283,7 +283,8 @@ blackhole(const ActiveParticles * act, double atime, Cosmology * CP, ForceTree *
     priv->units = units;
 
     /*************************************************************************/
-    priv->atime = atime;
+    priv->atime = atime; // this is afac=1 for non-cosmological runs
+    priv->time  = time; // this is loga for non-cosmological runs
     priv->a3inv = 1./(atime * atime * atime);
     priv->hubble = hubble_function(CP, atime);
     priv->CP = CP;
@@ -369,7 +370,7 @@ blackhole(const ActiveParticles * act, double atime, Cosmology * CP, ForceTree *
 
     myfree(ActiveBlackHoles);
 
-    write_blackhole_txt(FdBlackHoles, units, atime);
+    write_blackhole_txt(FdBlackHoles, units, time);
     walltime_measure("/BH/Info");
 }
 

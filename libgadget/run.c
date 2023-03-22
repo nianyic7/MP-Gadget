@@ -700,7 +700,8 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             /* Black hole accretion and feedback */
             if(All.BlackHoleOn)
                 //NYC: afac here because it only enters into the physical quantity conversion (i.e. no timestep involved)
-                blackhole(&Act, afac, &All.CP, &Tree, ddecomp, &times, units, fds.FdBlackHoles, fds.FdBlackholeDetails);
+                // Also input atime=loga (non-cosmo) because we want to output it in BH details
+                blackhole(&Act, afac, atime, &All.CP, &Tree, ddecomp, &times, units, fds.FdBlackHoles, fds.FdBlackholeDetails);
             message(0, "**** Passed Black Hole stuff **** \n");
 
             /**** radiative cooling and star formation *****/

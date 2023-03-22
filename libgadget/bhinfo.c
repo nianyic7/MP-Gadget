@@ -141,8 +141,8 @@ collect_BH_info(int * ActiveBlackHoles, int NumActiveBlackHoles, struct BHPriv *
         info->VDisp = BHP(p_i).VDisp;
         info->MgasEnc = priv->MgasEnc[PI];
         info->KEflag = priv->KEflag[PI];
-
-        info->a = priv->atime;
+        /* ComovingIntegration Note: priv->time=atime in cosmological context, priv->time=loga in non-cosmological context */
+        info->a = priv->time;
     }
 
     fwrite(infos,sizeof(struct BHinfo),NumActiveBlackHoles,FdBlackholeDetails);
