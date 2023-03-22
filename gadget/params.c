@@ -185,6 +185,7 @@ create_gadget_parameter_set()
     param_declare_int(ps, "PMGravOn", OPTIONAL, 1, "Enables PM gravity");
     param_declare_int(ps, "NonPeriodic", OPTIONAL, 0, "Whether the simulation has periodic boundary condition");
     param_declare_int(ps, "ComovingIntegrationOn", OPTIONAL, 1, "Whether the simulation is run on comoving coordinates");
+    param_declare_int(ps, "Redshift", OPTIONAL, 0, "Only used in non-cosmological scenarios");
 
     param_declare_double(ps, "GravitySoftening", OPTIONAL, 1./30., "Softening for collisionless particles; units of mean separation of DM. ForceSoftening is 2.8 times this.");
     param_declare_int(ps, "GravitySofteningGas", OPTIONAL, 1, "0 to use adaptive softening, where the gas softening is the smoothing length of the last step.");

@@ -415,7 +415,8 @@ blackhole_accretion_postprocess(int i, TreeWalk * tw)
     BHP(i).Mdot = mdot;
 
     double dtime = get_dloga_for_bin(P[i].TimeBinHydro, P[i].Ti_drift) / BH_GET_PRIV(tw)->hubble;
-
+    message(1, "******** BHacc check hubble=%g, dtime=%g *******\n", BH_GET_PRIV(tw)->hubble, dtime);
+    message(1, "******** BHacc check mdot=%g, dtime=%g *******\n", mdot, dtime);
     BHP(i).Mass += BHP(i).Mdot * dtime;
 
     /*************************************************************************/

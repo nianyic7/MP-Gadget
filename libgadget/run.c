@@ -130,6 +130,12 @@ set_all_global_params(ParameterSet * ps)
         All.CP.wa_fld = param_get_double(ps,"wa_fld");
         All.CP.Omega_ur = param_get_double(ps, "Omega_ur");
         All.CP.HubbleParam = param_get_double(ps, "HubbleParam");
+        
+        /********** Non-Comsological Flags ***************/
+        All.CP.NonPeriodic = param_get_int(ps, "NonPeriodic");
+        All.CP.ComovingIntegrationOn = param_get_int(ps, "ComovingIntegrationOn");
+        All.CP.Redshift = param_get_double(ps, "Redshift");
+
 
         All.OutputDebugFields = param_get_int(ps, "OutputDebugFields");
 
@@ -151,9 +157,6 @@ set_all_global_params(ParameterSet * ps)
         All.RandomParticleOffset = param_get_double(ps, "RandomParticleOffset");
         /* Convert to a fraction of the box, from a fraction of a PM mesh cell*/
         All.RandomParticleOffset /= All.Nmesh;
-        /********** Non-Comsological Flags ***************/
-        All.CP.NonPeriodic = param_get_int(ps, "NonPeriodic");
-        All.CP.ComovingIntegrationOn = param_get_int(ps, "ComovingIntegrationOn");
 
         All.SlotsIncreaseFactor = param_get_double(ps, "SlotsIncreaseFactor");
 
