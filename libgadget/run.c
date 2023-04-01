@@ -804,10 +804,12 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
              * each timebin has a force done individually and we do not store the acceleration hierarchy.
              * This does mean we double the cost of the force evaluations.*/
             if(totgravactive)
-                //NYC: Non-ComovingIntegration not enabled for hierarchical grav yet!
-                badtimestep = hierarchical_gravity_and_timesteps(&Act, &pm, ddecomp, GravAccel, &times, atime, HybridNuTracer, All.FastParticleType, &All.CP, All.OutputDir);
+                //Non-ComovingIntegration Note: it seems sufficient to put afac here
+                // input into long-range, shortrange grav timestep calc, which only used atime as scalefac calculation
+                badtimestep = hierarchical_gravity_and_timesteps(&Act, &pm, ddecomp, GravAccel, &times, afac, HybridNuTracer, All.FastParticleType, &All.CP, All.OutputDir);
             if(GasEnabled) {
                 /* Find hydro timesteps and apply the hydro kick, unsyncing the drift and kick times. */
+                // Non-ComovingIntegration: input into do_hydro_kick, which uses atime as scalefac, so afac here
                 badtimestep += find_hydro_timesteps(&Act, &times, afac, &All.CP, NumCurrentTiStep == 0);
                 /* If there is no hydro kick to do we still need to update the kick times.*/
                 if(!badtimestep)
