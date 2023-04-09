@@ -38,6 +38,16 @@ double FORCE_SOFTENING(int i, int type)
     if (TreeParams.AdaptiveSoftening == 1 && type == 0) {
         return P[i].Hsml;
     }
+    if (TreeParams.MultiSpeciesSoftening == 1) {
+        if (type == 0)
+            return TreeParams.SofteningType0;
+        if (type == 1)
+            return TreeParams.SofteningType1;
+        if (type == 4)
+            return TreeParams.SofteningType4;
+        if (type == 5)
+            return TreeParams.SofteningType5;
+    }
     /* Force is Newtonian beyond this.*/
     return 2.8 * GravitySoftening;
 }
@@ -76,6 +86,11 @@ set_gravshort_tree_params(ParameterSet * ps)
         TreeParams.Rcut = param_get_double(ps, "TreeRcut");
         TreeParams.FractionalGravitySoftening = param_get_double(ps, "GravitySoftening");
         TreeParams.AdaptiveSoftening = !param_get_int(ps, "GravitySofteningGas");
+        TreeParams.MultiSpeciesSoftening = param_get_int(ps, "MultiSpeciesSoftening");
+        TreeParams.SofteningType0 = param_get_double(ps, "SofteningType0");
+        TreeParams.SofteningType1 = param_get_double(ps, "SofteningType1");
+        TreeParams.SofteningType4 = param_get_double(ps, "SofteningType4");
+        TreeParams.SofteningType5 = param_get_double(ps, "SofteningType5");
     }
     MPI_Bcast(&TreeParams, sizeof(struct gravshort_tree_params), MPI_BYTE, 0, MPI_COMM_WORLD);
 }
@@ -341,7 +356,7 @@ int force_treeev_shortrange(TreeWalkQueryGravShort * input,
 
             /* This node accelerates the particle directly, and is not opened.*/
             int open_node = shall_we_open_node(nop->len, nop->mom.mass, r2, nop->center, inpos, BoxSize, aold, TreeUseBH, BHOpeningAngle2, NonPeriodic);
-            if(TreeParams.AdaptiveSoftening == 1 && (input->Soft < nop->mom.hmax))
+            if( ((TreeParams.AdaptiveSoftening == 1 ) || (TreeParams.MultiSpeciesSoftening == 1)) && (input->Soft < nop->mom.hmax))
             {
                 /* Always open the node if it has a larger softening than the particle,
                  * and the particle is inside its softening radius.
@@ -353,7 +368,7 @@ int force_treeev_shortrange(TreeWalkQueryGravShort * input,
             if(!open_node)
             {
                 double h = input->Soft;
-                if(TreeParams.AdaptiveSoftening)
+                if( (TreeParams.AdaptiveSoftening) || (TreeParams.MultiSpeciesSoftening))
                     h = DMAX(input->Soft, nop->mom.hmax);
                 /* ok, node can be used */
                 no = nop->sibling;
@@ -413,7 +428,7 @@ int force_treeev_shortrange(TreeWalkQueryGravShort * input,
             /* This is always the Newtonian softening,
              * match the default from FORCE_SOFTENING. */
             double h = 2.8 * GravitySoftening;
-            if(TreeParams.AdaptiveSoftening == 1) {
+            if( (TreeParams.AdaptiveSoftening == 1) || (TreeParams.MultiSpeciesSoftening == 1))  {
                 h = DMAX(input->Soft, FORCE_SOFTENING(pp, P[pp].Type));
             }
             /* Compute the acceleration and apply it to the output structure*/

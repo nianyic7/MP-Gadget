@@ -189,6 +189,11 @@ create_gadget_parameter_set()
 
     param_declare_double(ps, "GravitySoftening", OPTIONAL, 1./30., "Softening for collisionless particles; units of mean separation of DM. ForceSoftening is 2.8 times this.");
     param_declare_int(ps, "GravitySofteningGas", OPTIONAL, 1, "0 to use adaptive softening, where the gas softening is the smoothing length of the last step.");
+    param_declare_int(ps, "MultiSpeciesSoftening", OPTIONAL, 0, "1 to use different softening length for different particle types");
+    param_declare_double(ps, "SofteningType0", OPTIONAL, 1.0, "Softening Length in for particle type 0 in kpc; only used if MultiSpeciesSoftening is on.");
+    param_declare_double(ps, "SofteningType1", OPTIONAL, 1.0, "Softening Length in for particle type 1 in kpc; only used if MultiSpeciesSoftening is on.");
+    param_declare_double(ps, "SofteningType4", OPTIONAL, 1.0, "Softening Length in for particle type 4 in kpc; only used if MultiSpeciesSoftening is on.");
+    param_declare_double(ps, "SofteningType5", OPTIONAL, 1.0, "Softening Length in for particle type 5 in kpc; only used if MultiSpeciesSoftening is on.");
 
     param_declare_int(ps, "ImportBufferBoost", OPTIONAL, 2, "Memory factor to allow for there being more particles imported during treewlk than exported. Increase this if code crashes during treewalk with out of memory.");
     param_declare_double(ps, "PartAllocFactor", OPTIONAL, 1.5, "Over-allocation factor of particles. The load can be imbalanced to allow for the work to be more balanced.");
