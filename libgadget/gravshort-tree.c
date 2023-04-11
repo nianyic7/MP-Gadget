@@ -381,7 +381,7 @@ int force_treeev_shortrange(TreeWalkQueryGravShort * input,
 
             /* This node accelerates the particle directly, and is not opened.*/
             int open_node = shall_we_open_node(nop->len, nop->mom.mass, r2, nop->center, inpos, BoxSize, aold, TreeUseBH, BHOpeningAngle2, NonPeriodic);
-            if( ((TreeParams.AdaptiveSoftening == 1 ) && (input->Soft < nop->mom.hmax))
+            if ((TreeParams.AdaptiveSoftening == 1 ) && (input->Soft < nop->mom.hmax))
             {
                 /* Always open the node if it has a larger softening than the particle,
                  * and the particle is inside its softening radius.
@@ -394,11 +394,6 @@ int force_treeev_shortrange(TreeWalkQueryGravShort * input,
                 if (r2 < MaxSoftening * MaxSoftening)
                         open_node = 1;
             }
-            
-            
-            
-            
-            
 
             if(!open_node)
             {
