@@ -37,6 +37,7 @@ void gravshort_fill_ntab(const enum ShortRangeForceWindowType ShortRangeForceWin
 
 /*! Sets the (comoving) softening length, converting from units of the mean DM separation to comoving internal units. */
 void gravshort_set_softenings(double MeanDMSeparation);
+void gravshort_set_max_softening(void);
 
 /* gravitational softening length
  * (given in terms of an `equivalent' Plummer softening length) */

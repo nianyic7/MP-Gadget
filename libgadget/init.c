@@ -134,6 +134,8 @@ inttime_t init(int RestartSnapNum, const char * OutputDir, struct header_data * 
         gravshort_set_softenings(1.0);
     }
     
+    gravshort_set_max_softening();
+    
     fof_init(MeanSeparation[1]);
 
     inttime_t Ti_Current;

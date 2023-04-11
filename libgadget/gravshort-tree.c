@@ -29,6 +29,7 @@
 static struct gravshort_tree_params TreeParams;
 /*Softening length*/
 double GravitySoftening;
+double MaxSoftening;
 
 /* gravitational softening length
  * (given in terms of an `equivalent' Plummer softening length)
@@ -40,17 +41,18 @@ double FORCE_SOFTENING(int i, int type)
     }
     if (TreeParams.MultiSpeciesSoftening == 1) {
         if (type == 0)
-            return TreeParams.SofteningType0;
+            return 2.8 * TreeParams.SofteningType0;
         if (type == 1)
-            return TreeParams.SofteningType1;
+            return 2.8 * TreeParams.SofteningType1;
         if (type == 4)
-            return TreeParams.SofteningType4;
+            return 2.8 * TreeParams.SofteningType4;
         if (type == 5)
-            return TreeParams.SofteningType5;
+            return 2.8 * TreeParams.SofteningType5;
     }
     /* Force is Newtonian beyond this.*/
     return 2.8 * GravitySoftening;
 }
+
 
 /*! Sets the (comoving) softening length, converting from units of the mean separation to comoving internal units. */
 void
@@ -60,6 +62,29 @@ gravshort_set_softenings(double MeanSeparation)
     /* 0: Gas is collisional */
     message(0, "GravitySoftening = %g\n", GravitySoftening);
 }
+
+void gravshort_set_max_softening(void)
+{
+    if (TreeParams.MultiSpeciesSoftening == 0) {
+        MaxSoftening = GravitySoftening;
+        message(0, "Maximum Softening = %g\n", MaxSoftening);
+        return;
+    }
+    
+    double maxsoft = 0;
+    
+    if (TreeParams.SofteningType0 > maxsoft)
+        maxsoft = TreeParams.SofteningType0;
+    if (TreeParams.SofteningType1 > maxsoft)
+        maxsoft = TreeParams.SofteningType1;
+    if (TreeParams.SofteningType4 > maxsoft)
+        maxsoft = TreeParams.SofteningType4;
+    if (TreeParams.SofteningType5 > maxsoft)
+        maxsoft = TreeParams.SofteningType5;
+    MaxSoftening = 2.8 * maxsoft;
+    message(0, "Maximum Softening = %g\n", MaxSoftening);
+}
+
 
 /*This is a helper for the tests*/
 void set_gravshort_treepar(struct gravshort_tree_params tree_params)
@@ -356,7 +381,7 @@ int force_treeev_shortrange(TreeWalkQueryGravShort * input,
 
             /* This node accelerates the particle directly, and is not opened.*/
             int open_node = shall_we_open_node(nop->len, nop->mom.mass, r2, nop->center, inpos, BoxSize, aold, TreeUseBH, BHOpeningAngle2, NonPeriodic);
-            if( ((TreeParams.AdaptiveSoftening == 1 ) || (TreeParams.MultiSpeciesSoftening == 1)) && (input->Soft < nop->mom.hmax))
+            if( ((TreeParams.AdaptiveSoftening == 1 ) && (input->Soft < nop->mom.hmax))
             {
                 /* Always open the node if it has a larger softening than the particle,
                  * and the particle is inside its softening radius.
@@ -364,12 +389,24 @@ int force_treeev_shortrange(TreeWalkQueryGravShort * input,
                 if(r2 < nop->mom.hmax * nop->mom.hmax)
                     open_node = 1;
             }
+            
+            if ((TreeParams.MultiSpeciesSoftening == 1) && (input->Soft < MaxSoftening)) {
+                if (r2 < MaxSoftening * MaxSoftening)
+                        open_node = 1;
+            }
+            
+            
+            
+            
+            
 
             if(!open_node)
             {
                 double h = input->Soft;
-                if( (TreeParams.AdaptiveSoftening) || (TreeParams.MultiSpeciesSoftening))
+                if (TreeParams.AdaptiveSoftening)
                     h = DMAX(input->Soft, nop->mom.hmax);
+                if (TreeParams.MultiSpeciesSoftening)
+                    h = DMAX(input->Soft, MaxSoftening);
                 /* ok, node can be used */
                 no = nop->sibling;
                 /* Compute the acceleration and apply it to the output structure*/
