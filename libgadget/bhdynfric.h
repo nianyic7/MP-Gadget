@@ -11,6 +11,11 @@ struct BHDynFricPriv {
     int * BH_SurroundingParticles;
     MyFloat (*BH_SurroundingVel)[3];
     MyFloat * BH_SurroundingRmsVel;
+    
+    MyFloat (*BH_DFAccel)[3];
+
+    //old
+    MyFloat (*BH_DFAccelOld)[3];
 
     /* Time factors*/
     double atime;

@@ -35,6 +35,8 @@ struct __attribute__((__packed__)) BHinfo{
 
     /****************************************/
     double Pos[3];
+    // old
+    double BH_DFAccelOld[3];
     MyFloat BH_SurroundingDensity;
     MyFloat BH_SurroundingParticles;
     MyFloat BH_SurroundingVel[3];
@@ -115,7 +117,9 @@ collect_BH_info(int * ActiveBlackHoles, int NumActiveBlackHoles, struct BHPriv *
         info->BH_SurroundingVel[0] = dynpriv->BH_SurroundingVel[PI][0];
         info->BH_SurroundingVel[1] = dynpriv->BH_SurroundingVel[PI][1];
         info->BH_SurroundingVel[2] = dynpriv->BH_SurroundingVel[PI][2];
-
+        for(k=0; k < 3; k++) {
+            info->BH_DFAccelOld[k] = dynpriv->BH_DFAccelOld[PI][k];
+        }
         /****************************************************************************/
         info->BH_accreted_BHMass = priv->BH_accreted_BHMass[PI];
         info->BH_accreted_Mass = priv->BH_accreted_Mass[PI];
