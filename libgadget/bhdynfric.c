@@ -1,5 +1,6 @@
 #include <math.h>
 #include "treewalk.h"
+#include "gravity.h"
 #include "densitykernel.h"
 #include "bhdynfric.h"
 #include "density.h"
@@ -11,10 +12,10 @@ static struct BlackholeDynFricParams
     double BH_DFbmax; /* the maximum impact range, in physical unit of kpc. */
 } blackhole_dynfric_params;
 
-/* For the wind hsml loop*/
-#define NHSML 5 /* Number of densities to evaluate for wind weight ngbiter*/
-#define NUMNGB 1024 /*Number of DM+star ngb to evaluate DF */
-#define MAXDMDEVIATION 2
+// /* For the wind hsml loop*/
+// #define NHSML 5 /* Number of densities to evaluate for wind weight ngbiter*/
+// #define NUMNGB 1024 /*Number of DM+star ngb to evaluate DF */
+// #define MAXDMDEVIATION 2
 
 
 /*Set the parameters of the BH module*/
@@ -254,10 +255,12 @@ blackhole_dynfric_ngbiter(TreeWalkQueryBHDynfric * I,
             for(d = 0; d < 3; d++){
                 b_j += (dx[d] - r_proj * dv[d] / dv_mag / dv_mag) * (dx[d] - r_proj * dv[d] / dv_mag / dv_mag);
             }
-            double alpha_j = b_j * dv_mag * dv_mag / BH_GET_PRIV(lv->tw)->CP->GravInternal * I->Mass;
+            double alpha_j = b_j * dv_mag * dv_mag / BHDYN_GET_PRIV(lv->tw)->CP->GravInternal * I->Mass;
 
             double soft_fac;
-            double u = r/FORCE_SOFTENING(0,1);
+            // this is the softening between the BH and the other particle
+            double grav_soft = DMAX(FORCE_SOFTENING(0,5),FORCE_SOFTENING(0,P[other].Type));
+            double u = r/grav_soft;
 
             if (u < 0.5){
                 soft_fac = u * u * u * (10.66666666667 - 38.4 * u * u + 32 * u * u * u);
@@ -271,7 +274,7 @@ blackhole_dynfric_ngbiter(TreeWalkQueryBHDynfric * I,
 
             double df_mag = alpha_j * b_j / (1 + alpha_j * alpha_j) / r;
             df_mag *= soft_fac;
-            df_mag *= BH_GET_PRIV(lv->tw)->CP->GravInternal * mass_j / r2;
+            df_mag *= BHDYN_GET_PRIV(lv->tw)->CP->GravInternal * mass_j / r2;
 
             for(d = 0; d < 3; d++){
                 O->DFAccel[d] = df_mag * dv[d] / dv_mag;
