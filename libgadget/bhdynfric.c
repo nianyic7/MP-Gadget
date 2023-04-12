@@ -238,7 +238,10 @@ blackhole_dynfric_ngbiter(TreeWalkQueryBHDynfric * I,
             
             /*--------------------- New ------------------------*/
             for(d = 0; d < 3; d++){
-                dx[d] = NEAREST(P[other].Pos[d] - I->base.Pos[d], PartManager->BoxSize);
+                if (BHDYN_GET_PRIV(lv->tw)->CP->NonPeriodic) 
+                    dx[d] = P[other].Pos[d] - I->base.Pos[d];
+                else
+                    dx[d] = NEAREST(P[other].Pos[d] - I->base.Pos[d], PartManager->BoxSize);
                 dv[d] = VelPred[d] - I->Vel[d];
             }
 
