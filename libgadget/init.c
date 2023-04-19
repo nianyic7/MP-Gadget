@@ -116,16 +116,15 @@ inttime_t init(int RestartSnapNum, const char * OutputDir, struct header_data * 
     check_positions(PartManager);
 
     double MeanSeparation[6] = {0};
-
     get_mean_separation(MeanSeparation, PartManager->BoxSize, header->NTotalInit);
-
+    
     if(RestartSnapNum == -1)
         check_smoothing_length(PartManager, MeanSeparation);
-
+    message(0, "Finished checking smoothing length...\n"); 
     /* As the above will mostly take place
      * on Task 0, there will be a lot of imbalance*/
     MPIU_Barrier(MPI_COMM_WORLD);
-
+    message(0, "Setting softening length...\n");
     if (CP->ComovingIntegrationOn) { 
         gravshort_set_softenings(MeanSeparation[1]);
     }
@@ -342,7 +341,7 @@ void check_positions(struct part_manager_type * PartManager)
     int i;
     int numzero = 0;
     int lastzero = -1;
-
+    message(0, "Checking positions...\n");
     #pragma omp parallel for reduction(+: numzero) reduction(max:lastzero)
     for(i=0; i< PartManager->NumPart; i++){
         int j;
@@ -359,6 +358,7 @@ void check_positions(struct part_manager_type * PartManager)
     if(numzero > 1)
         endrun(5, "Particle positions contain %d zeros at particle %d. Pos %g %g %g. Likely write corruption!\n",
                 numzero, lastzero, PartManager->Base[lastzero].Pos[0], PartManager->Base[lastzero].Pos[1], PartManager->Base[lastzero].Pos[2]);
+    message(0, "Finished checking positions...\n");
 }
 
 /*! This routine checks that the initial smoothing lengths of the particles
