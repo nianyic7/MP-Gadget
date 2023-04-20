@@ -597,6 +597,7 @@ void set_bh_first_timestep(int mTimeBin)
     for(pa = 0; pa < PartManager->NumPart; pa++)
         if(P[pa].Type == 5)
             P[pa].TimeBinHydro = mTimeBin;
+        message(1, "******  Setting BH Timestep ***********: %d \n", mTimeBin);
 }
 
 /* This function assigns new short-range timesteps to particles.
@@ -828,8 +829,13 @@ find_timesteps(const ActiveParticles * act, DriftKickTimes * times, const double
      * On the first timestep this is not effective because all the particles have zero timestep.
      * So on the first timestep only set all BH particles to the smallest allowable timestep.
      * Note we can leave the gravitational timestep as set by the acceleration: repositioning may take care of it.*/
-    if(isFirstTimeStep)
+    if(isFirstTimeStep) {
         set_bh_first_timestep(mTimeBin);
+        message(0, "first time step, set BH timestep\n");
+    }
+    else 
+        message(0, "not first time step");
+    
     walltime_measure("/Timeline");
     times->mintimebin = mTimeBin;
     times->maxtimebin = maxTimeBin;
@@ -1329,14 +1335,20 @@ build_active_particles(ActiveParticles * act, const DriftKickTimes * const times
     size_t schedsz = PartManager->NumPart / NumThreads + 1;
     int64_t nactivegrav = act->NumActiveGravity;
     int64_t nactivehydro = act->NumActiveHydro;
+    
+    message(1, "Tot num part check: %ld\n", PartManager->NumPart);
     #pragma omp parallel for schedule(static, schedsz) reduction(+: nactivegrav) reduction(+: nactivehydro)
     for(i = 0; i < PartManager->NumPart; i++)
     {
         const int bin_hydro = P[i].TimeBinHydro;
         const int bin_gravity = P[i].TimeBinGravity;
         const int tid = omp_get_thread_num();
-        if(P[i].IsGarbage || P[i].Swallowed)
+        if(P[i].IsGarbage || P[i].Swallowed) {
+            if (P[i].Type == 5)
+                message(1, "What's wrong with this BH????, Garbage: %d, Swallowed: %d \n", P[i].IsGarbage, P[i].Swallowed);
             continue;
+        }
+
         /* when we are in PM, all particles must have been synced. */
         if (P[i].Ti_drift != times->Ti_Current) {
             endrun(5, "Particle %d type %d has drift time %x not ti_current %x!",i, P[i].Type, P[i].Ti_drift, times->Ti_Current);
@@ -1363,6 +1375,13 @@ build_active_particles(ActiveParticles * act, const DriftKickTimes * const times
         int bin = bin_gravity;
         if(hydro_particle)
             bin = bin_hydro;
+        
+        /*NYC debugging */
+        if (P[i].Type == 5) {
+            message(1, "BH timebin info: bin_gravity=%ld, bin_hydro=%ld, gravity_active=%d, hydro_active=%d", bin_gravity, bin_hydro, gravity_active, hydro_active);
+        }
+        /*************/
+        
         TimeBinCountType[(TIMEBINS + 1) * (6* tid + P[i].Type) + bin] ++;
     }
     if(act->ActiveParticle) {

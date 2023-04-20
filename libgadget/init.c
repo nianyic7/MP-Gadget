@@ -170,6 +170,7 @@ inttime_t init(int RestartSnapNum, const char * OutputDir, struct header_data * 
 
         if(P[i].Type == 5)
         {
+            message(1, "######### check BH initialization: %d \n", P[i].Swallowed);
             for(j = 0; j < 3; j++) {
                 BHP(i).DFAccel[j] = 0;
                 BHP(i).DragAccel[j] = 0;

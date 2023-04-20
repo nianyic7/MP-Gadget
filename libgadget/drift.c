@@ -133,6 +133,10 @@ void drift_all_particles(inttime_t ti0, inttime_t ti1, Cosmology * CP, const dou
         for (int k=0; k < 3; k++) {
             Xmin[k] = (Xmin[k] < P[i].Pos[k]) ? Xmin[k] : P[i].Pos[k];
             Xmax[k] = (Xmax[k] > P[i].Pos[k]) ? Xmax[k] : P[i].Pos[k];
+            if (( P[i].Pos[j] > PartManager->BoxSize) || (P[i].Pos[j]  < 0)) {
+                slots_mark_garbage(i, PartManager, SlotsManager);
+                message(1, "Particle type %d ID %ld out of box and marked as garbage with Pos %g %g %g n", P[i].Type, P[i].ID, P[i].Pos[0], P[i].Pos[1], P[i].Pos[2]);
+            }
         } 
     }
 

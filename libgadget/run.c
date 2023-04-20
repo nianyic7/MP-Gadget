@@ -791,6 +791,7 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
         int badtimestep=0;
         if(!All.HierarchicalGravity) {
             message(0, "**** Inside Non-HierarchicalGravity **** \n");
+            message(0, "NumCurrentTiStep = %d \n", NumCurrentTiStep);
             const double asmth = pm.Asmth * PartManager->BoxSize / pm.Nmesh; // TODO_NYC: asmth should not change with boxsize
             badtimestep = find_timesteps(&Act, &times, afac, All.FastParticleType, &All.CP, asmth, NumCurrentTiStep == 0);
             /* Update velocity and ti_kick to the new step, with the newly computed step size. Unsyncs ti_kick and ti_drift.
