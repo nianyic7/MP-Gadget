@@ -124,29 +124,32 @@ void drift_all_particles(inttime_t ti0, inttime_t ti1, Cosmology * CP, const dou
         PartManager->Base[i].Ti_drift = ti1;
     }
     
-    /******************* For debugging OOB ***************************/
-    double Xmin[3] = {1.0e30, 1.0e30, 1.0e30};
-    double Xmax[3] = {-1.0e30, -1.0e30, -1.0e30};
+    if (CP->NonPeriodic) {
+        /******************* For debugging OOB ***************************/
+        double Xmin[3] = {1.0e30, 1.0e30, 1.0e30};
+        double Xmax[3] = {-1.0e30, -1.0e30, -1.0e30};
 
 
-    for(i = 0; i < PartManager->NumPart; i++) {
-        for (int k=0; k < 3; k++) {
-            Xmin[k] = (Xmin[k] < P[i].Pos[k]) ? Xmin[k] : P[i].Pos[k];
-            Xmax[k] = (Xmax[k] > P[i].Pos[k]) ? Xmax[k] : P[i].Pos[k];
-            if (( P[i].Pos[k] > PartManager->BoxSize) || (P[i].Pos[k]  < 0)) {
-                slots_mark_garbage(i, PartManager, SlotsManager);
-                message(1, "Particle type %d ID %ld out of box and marked as garbage with Pos %g %g %g n", P[i].Type, P[i].ID, P[i].Pos[0], P[i].Pos[1], P[i].Pos[2]);
-            }
-        } 
+        for(i = 0; i < PartManager->NumPart; i++) {
+            for (int k=0; k < 3; k++) {
+                Xmin[k] = (Xmin[k] < P[i].Pos[k]) ? Xmin[k] : P[i].Pos[k];
+                Xmax[k] = (Xmax[k] > P[i].Pos[k]) ? Xmax[k] : P[i].Pos[k];
+                if (( P[i].Pos[k] - PartManager->CurrentParticleOffset[k] > 10000.) || (P[i].Pos[k] - PartManager->CurrentParticleOffset[k] < 0)) {
+                    slots_mark_garbage(i, PartManager, SlotsManager);
+                    message(1, "Particle type %d ID %ld out of box and marked as garbage with Pos %g %g %g n", P[i].Type, P[i].ID, 
+                            P[i].Pos[0]-PartManager->CurrentParticleOffset[0], P[i].Pos[1]-PartManager->CurrentParticleOffset[1], P[i].Pos[2]-PartManager->CurrentParticleOffset[2]);
+                }
+            } 
+        }
+
+        MPI_Barrier(MPI_COMM_WORLD);
+        MPI_Allreduce(MPI_IN_PLACE, Xmin, 3, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+        MPI_Allreduce(MPI_IN_PLACE, Xmax, 3, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+        MPI_Barrier(MPI_COMM_WORLD);
+        message(0, "**** check Xmin/Xmax inside drift \n****");
+        message(0, "***** Xmin=(%g, %g, %g)  **** \n", Xmin[0], Xmin[1], Xmin[2]); 
+        message(0, "***** Xmax=(%g, %g, %g)  **** \n", Xmax[0], Xmax[1], Xmax[2]); 
     }
-
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Allreduce(MPI_IN_PLACE, Xmin, 3, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-    MPI_Allreduce(MPI_IN_PLACE, Xmax, 3, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-    MPI_Barrier(MPI_COMM_WORLD);
-    message(0, "**** check Xmin/Xmax inside drift \n****");
-    message(0, "***** Xmin=(%g, %g, %g)  **** \n", Xmin[0], Xmin[1], Xmin[2]); 
-    message(0, "***** Xmax=(%g, %g, %g)  **** \n", Xmax[0], Xmax[1], Xmax[2]); 
 /****************************************************/
 
     walltime_measure("/Drift/All");

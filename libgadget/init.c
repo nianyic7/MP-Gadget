@@ -111,9 +111,8 @@ inttime_t init(int RestartSnapNum, const char * OutputDir, struct header_data * 
 
     if (CP->ComovingIntegrationOn) {
         check_omega(PartManager, CP, get_generations(), header->MassTable);
+        check_positions(PartManager);
     }
-
-    check_positions(PartManager);
 
     double MeanSeparation[6] = {0};
     get_mean_separation(MeanSeparation, PartManager->BoxSize, header->NTotalInit);

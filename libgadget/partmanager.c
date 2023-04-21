@@ -100,6 +100,8 @@ set_lbox_nonperiodic(struct part_manager_type * PartManager) {
 
     #pragma omp parallel for reduction(min: xmin,ymin,zmin) reduction(max: xmax,ymax,zmax)
     for(i = 0; i < PartManager->NumPart; i ++) {
+        if(P[i].IsGarbage || P[i].Swallowed)
+            continue;
         // const struct particle_data * pp = &PartManager->Base[i];
         xmin = (xmin < P[i].Pos[0]) ? xmin:P[i].Pos[0]; 
         ymin = (ymin < P[i].Pos[1]) ? ymin:P[i].Pos[1]; 
