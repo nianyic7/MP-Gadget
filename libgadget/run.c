@@ -329,10 +329,10 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
     int SnapshotFileCount = RestartSnapNum;
 
     PetaPM pm = {0};
-    if (All.CP.NonPeriodic) {
-        double rel_random_shift[3] = {0};   
+    double rel_random_shift[3] = {0};  
+    if (All.CP.NonPeriodic) { 
         set_lbox_nonperiodic(PartManager);
-        //update_offset(PartManager, rel_random_shift);
+        // update_offset(PartManager, rel_random_shift);
 
         message(0, "***** set boxsize %g *****", PartManager->BoxSize);
         PartManager->NonPeriodic = 1;
