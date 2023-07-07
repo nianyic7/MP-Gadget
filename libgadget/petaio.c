@@ -902,7 +902,13 @@ static void GTInternalEnergy(int i, float * out, void * baseptr, void * smanptr,
     int PI = ((struct particle_data *) baseptr)[i].PI;
     struct slot_info * info = &(((struct slots_manager_type *) smanptr)->info[0]);
     struct sph_particle_data * sl = (struct sph_particle_data *) info->ptr;
-    double a3inv = 1/(params->atime * params->atime * params->atime);
+    double a3inv;
+    if (!params->ComovingIntegrationOn) {
+        a3inv = 1.0;
+    }
+    else {
+        a3inv = 1 / (params->atime * params->atime * params->atime);
+    }
     *out = sl[PI].Entropy / GAMMA_MINUS1 * pow(sl[PI].Density * a3inv, GAMMA_MINUS1);
 }
 
@@ -911,7 +917,13 @@ static void STInternalEnergy(int i, float * out, void * baseptr, void * smanptr,
     int PI = ((struct particle_data *) baseptr)[i].PI;
     struct slot_info * info = &(((struct slots_manager_type *) smanptr)->info[0]);
     struct sph_particle_data * sl = (struct sph_particle_data *) info->ptr;
-    double a3inv = 1/(params->atime * params->atime * params->atime);
+    double a3inv;
+    if (!params->ComovingIntegrationOn) {
+        a3inv = 1.0;
+    }
+    else {
+        a3inv = 1 / (params->atime * params->atime * params->atime);
+    }
     sl[PI].Entropy  = GAMMA_MINUS1 * u / pow(sl[PI].Density * a3inv, GAMMA_MINUS1);
 }
 
