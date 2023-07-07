@@ -1004,10 +1004,9 @@ void register_io_blocks(struct IOTable * IOTable, int WriteGroupID, int MetalRet
     IO_REG(InternalEnergy,   "f4", 1, 0, IOTable);
 
     /* Cooling */
-    if (ComovingIntegrationOn) {
-    	IO_REG(ElectronAbundance,       "f4", 1, 0, IOTable);
-    	IO_REG_WRONLY(NeutralHydrogenFraction, "f4", 1, 0, IOTable);
-    }
+    IO_REG(ElectronAbundance,       "f4", 1, 0, IOTable);
+    IO_REG_WRONLY(NeutralHydrogenFraction, "f4", 1, 0, IOTable);
+
 
     if(IO.OutputHeliumFractions) {
         IO_REG_WRONLY(HeliumIFraction, "f4", 1, 0, IOTable);
