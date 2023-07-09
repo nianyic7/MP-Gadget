@@ -278,9 +278,10 @@ begrun(const int RestartSnapNum, struct header_data * head)
         setup_smoothinglengths(RestartSnapNum, ddecomp, &All.CP, All.BlackHoleOn, get_MinEgySpec(), units.UnitInternalEnergy_in_cgs, ti_init, head->TimeSnapshot, head->NTotalInit[0]);
         domain_free(ddecomp);
     }
-    else
+    else if (All.CP.ComovingIntegrationOn)
         /* When we restart, validate the SPH properties of the particles.
          * This also allows us to increase MinEgySpec on a restart if we choose.*/
+        /* Skip density entropy check for idealized IC (for now)*/
         check_density_entropy(&All.CP, get_MinEgySpec(), head->TimeSnapshot);
 
     return ti_init;
