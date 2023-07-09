@@ -499,7 +499,7 @@ setup_smoothinglengths(int RestartSnapNum, DomainDecomp * ddecomp, Cosmology * C
     else {
         a3 = 1.;
     }
-
+    /* ComovingIntegration Notes: we're good here, smoothing length and entropy not touched on restart */
     if(RestartSnapNum >= 0)
         return;
 

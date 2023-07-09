@@ -290,6 +290,7 @@ density(const ActiveParticles * act, int update_hsml, int DoEgyDensity, int Blac
     init_kick_factor_data(&priv->kf, &times, CP);
     priv->times = &times;
 
+    /* ComovingIntegration comments: why these conditions and should I change them? */
     if(!act->ActiveParticle || act->NumActiveHydro > 0.1 * (SlotsManager->info[0].size + SlotsManager->info[5].size)) {
         priv->SPH_predicted->EntVarPred = (MyFloat *) mymalloc2("EntVarPred", sizeof(MyFloat) * SlotsManager->info[0].size);
         #pragma omp parallel for
