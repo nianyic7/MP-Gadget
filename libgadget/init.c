@@ -555,6 +555,7 @@ setup_smoothinglengths(int RestartSnapNum, DomainDecomp * ddecomp, Cosmology * C
         set_init_hsml(&Tree, ddecomp, MeanGasSeparation);
 
     /* for clean IC with U input only, we need to iterate to find entropy */
+    /* ComovingIntegration Note: u_init is not used for idealized runs */
     double u_init = (1.0 / GAMMA_MINUS1) * (BOLTZMANN / PROTONMASS) * InitParams.InitGasTemp;
     u_init /= uu_in_cgs; /* unit conversion */
 
