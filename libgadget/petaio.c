@@ -995,8 +995,12 @@ void register_io_blocks(struct IOTable * IOTable, int WriteGroupID, int MetalRet
     IO_REG(SmoothingLength,  "f4", 1, 0, IOTable);
     IO_REG(Density,          "f4", 1, 0, IOTable);
 
-    if(DensityIndependentSphOn())
-        IO_REG(EgyWtDensity,          "f4", 1, 0, IOTable);
+    if (DensityIndependentSphOn()) {
+        if (ComovingIntegrationOn)
+            IO_REG(EgyWtDensity,          "f4", 1, 0, IOTable);
+        else
+            IO_REG_NONFATAL(EgyWtDensity,          "f4", 1, 0, IOTable);
+    }
 
     /* On reload this sets the Entropy variable, need the densities.
      * Register this after Density and EgyWtDensity will ensure density is read

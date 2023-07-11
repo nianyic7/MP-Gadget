@@ -451,9 +451,17 @@ setup_density_indep_entropy(const ActiveParticles * act, ForceTree * Tree, Cosmo
         int i;
         /* since ICs give energies, not entropies, need to iterate get this initialized correctly */
         #pragma omp parallel for
-        for(i = 0; i < SlotsManager->info[0].size; i++) {
-            SphP[i].Entropy = GAMMA_MINUS1 * u_init / pow(SphP[i].EgyWtDensity / a3 , GAMMA_MINUS1);
-            olddensity[i] = SphP[i].EgyWtDensity;
+        if (CP->ComovingIntegrationOn) {
+            for(i = 0; i < SlotsManager->info[0].size; i++) {
+                SphP[i].Entropy = GAMMA_MINUS1 * u_init / pow(SphP[i].EgyWtDensity / a3 , GAMMA_MINUS1);
+                olddensity[i] = SphP[i].EgyWtDensity;
+            }
+        }
+        else {
+            for(i = 0; i < SlotsManager->info[0].size; i++) {
+                SphP[i].Entropy = GAMMA_MINUS1 * SphP[i].InternalEnergy / pow(SphP[i].EgyWtDensity / a3 , GAMMA_MINUS1);
+                olddensity[i] = SphP[i].EgyWtDensity;
+            }
         }
         /* Empty kick factors as we do not move*/
         DriftKickTimes times = init_driftkicktime(Ti_Current);
@@ -499,8 +507,10 @@ setup_smoothinglengths(int RestartSnapNum, DomainDecomp * ddecomp, Cosmology * C
     else {
         a3 = 1.;
     }
-    /* ComovingIntegration Notes: we're good here, smoothing length and entropy not touched on restart */
-    if(RestartSnapNum >= 0)
+    /* idealized IC is always snapshot 0 */
+    if ((RestartSnapNum >= 0) && (CP->ComovingIntegrationOn))
+        return;
+    if ((RestartSnapNum > 0) && (!CP->ComovingIntegrationOn))
         return;
 
     if(InitParams.InitGasTemp < 0) {
@@ -508,7 +518,7 @@ setup_smoothinglengths(int RestartSnapNum, DomainDecomp * ddecomp, Cosmology * C
             InitParams.InitGasTemp = CP->CMBTemperature / atime;
         }
         else {
-            InitParams.InitGasTemp = CP->CMBTemperature;
+            InitParams.InitGasTemp = 1e4;
         }
     }
 
@@ -526,7 +536,9 @@ setup_smoothinglengths(int RestartSnapNum, DomainDecomp * ddecomp, Cosmology * C
     /* Finds fathers for each gas and BH particle, so need BH*/
     force_tree_rebuild_mask(&Tree, ddecomp, GASMASK+BHMASK, NULL);
     /* Set the initial smoothing length for gas and DM, compute tree moments.*/
-    set_init_hsml(&Tree, ddecomp, MeanGasSeparation);
+    /* ComovingIntegration Note: skip init smoothing for idealized run*/
+    if (CP->ComovingIntegrationOn)
+        set_init_hsml(&Tree, ddecomp, MeanGasSeparation);
 
     /* for clean IC with U input only, we need to iterate to find entropy */
     double u_init = (1.0 / GAMMA_MINUS1) * (BOLTZMANN / PROTONMASS) * InitParams.InitGasTemp;
@@ -556,11 +568,13 @@ setup_smoothinglengths(int RestartSnapNum, DomainDecomp * ddecomp, Cosmology * C
     if(DensityIndependentSphOn()) {
         setup_density_indep_entropy(&act, &Tree, CP, &sph_pred, u_init, a3, Ti_Current, BlackHoleOn);
     }
-    else {
+    else if (CP->ComovingIntegrationOn){
         /*Initialize to initial energy*/
+        /* No need to do anything when ComovingIntergation not on*/
         #pragma omp parallel for
         for(i = 0; i < SlotsManager->info[0].size; i++)
             SphP[i].Entropy = GAMMA_MINUS1 * u_init / pow(SphP[i].Density / a3 , GAMMA_MINUS1);
     }
+    
     force_tree_free(&Tree);
 }
