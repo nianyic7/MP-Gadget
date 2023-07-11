@@ -446,20 +446,33 @@ setup_density_indep_entropy(const ActiveParticles * act, ForceTree * Tree, Cosmo
         SphP[j].EgyWtDensity = SphP[j].Density;
 
     MyFloat * olddensity = (MyFloat *)mymalloc("olddensity ", SlotsManager->info[0].size * sizeof(MyFloat));
+    MyFloat * oldu = (MyFloat *)mymalloc("oldu ", SlotsManager->info[0].size * sizeof(MyFloat));
+    if (CP->ComovingIntegrationOn) {
+        #pragma omp parallel for
+        for(j = 0; j < SlotsManager->info[0].size; j++)
+            oldu[j] = u_init;
+    }
+    else {
+        #pragma omp parallel for
+        for(j = 0; j < SlotsManager->info[0].size; j++) 
+            oldu[j] = SphP[j].Entropy / GAMMA_MINUS1 * pow(SphP[j].EgyWtDensity / a3 , GAMMA_MINUS1);
+    }
     for(j = 0; j < 100; j++)
     {
         int i;
         /* since ICs give energies, not entropies, need to iterate get this initialized correctly */
-        #pragma omp parallel for
+        
         if (CP->ComovingIntegrationOn) {
+            #pragma omp parallel for
             for(i = 0; i < SlotsManager->info[0].size; i++) {
                 SphP[i].Entropy = GAMMA_MINUS1 * u_init / pow(SphP[i].EgyWtDensity / a3 , GAMMA_MINUS1);
                 olddensity[i] = SphP[i].EgyWtDensity;
             }
         }
         else {
+            #pragma omp parallel for
             for(i = 0; i < SlotsManager->info[0].size; i++) {
-                SphP[i].Entropy = GAMMA_MINUS1 * SphP[i].InternalEnergy / pow(SphP[i].EgyWtDensity / a3 , GAMMA_MINUS1);
+                SphP[i].Entropy = GAMMA_MINUS1 * oldu[i] / pow(SphP[i].EgyWtDensity / a3 , GAMMA_MINUS1);
                 olddensity[i] = SphP[i].EgyWtDensity;
             }
         }
@@ -486,6 +499,7 @@ setup_density_indep_entropy(const ActiveParticles * act, ForceTree * Tree, Cosmo
             stop = 1;
 
     }
+    myfree(oldu);
     myfree(olddensity);
 }
 
