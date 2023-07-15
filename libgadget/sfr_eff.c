@@ -854,6 +854,8 @@ static double get_starformation_rate_full(int i, MyFloat * GradRho, struct sfr_e
             endrun(1, "GradRho not allocated but has SFR_CRITERION_MOLECULAR_H2. Should never happen!\n");
         rateOfSF *= get_sfr_factor_due_to_h2(i, GradRho, atime);
     }
+    /* NYC: in current params sfr-self-grav is not on so doesnt matter for idealized run, 
+    but still remove the hubble flow term in get_sfr_factor_due_to_selfgravity*/
     if (HAS(sfr_params.StarformationCriterion, SFR_CRITERION_SELFGRAVITY)) {
         rateOfSF *= get_sfr_factor_due_to_selfgravity(i, atime, a3inv, hubble, GravInternal);
     }
@@ -1078,7 +1080,7 @@ static double get_sfr_factor_due_to_h2(int i, MyFloat * GradRho_mag, const doubl
 static double get_sfr_factor_due_to_selfgravity(int i, const double atime, const double a3inv, const double hubble, const double GravInternal) {
     const double a2 = atime * atime;
     double divv = SPHP(i).DivVel / a2;
-
+    /* ComovingIntegratio TODO: comment out this line for comoving integration off*/
     divv += 3.0*hubble * a2; // hubble-flow correction
 
     if(HAS(sfr_params.StarformationCriterion, SFR_CRITERION_CONVERGENT_FLOW)) {
