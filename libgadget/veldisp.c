@@ -260,7 +260,9 @@ wind_vdisp_ngbiter(TreeWalkQueryWindVDisp * I,
                  * The I particle is active so always at current time.*/
                 /* ComovingIntegration Note: ignore hubble flow in non-comoving runs*/
                 double vel;
-                if (CP->ComovingIntegrationOn)
+                /* FIXME: this should be comovingintegration insdead of nonperiodic, 
+                but currently do not have access to CP in this treewalk */
+                if (!PartManager->NumPart->NonPeriodic)
                     vel = VelPred[d] - I->Vel[d] + WINDV_GET_PRIV(lv->tw)->hubble * atime * atime * dist[d];
                 else
                     vel = VelPred[d] - I->Vel[d];
