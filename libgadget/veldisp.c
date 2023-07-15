@@ -262,7 +262,7 @@ wind_vdisp_ngbiter(TreeWalkQueryWindVDisp * I,
                 double vel;
                 /* FIXME: this should be comovingintegration insdead of nonperiodic, 
                 but currently do not have access to CP in this treewalk */
-                if (!PartManager->NumPart->NonPeriodic)
+                if (!PartManager->NonPeriodic)
                     vel = VelPred[d] - I->Vel[d] + WINDV_GET_PRIV(lv->tw)->hubble * atime * atime * dist[d];
                 else
                     vel = VelPred[d] - I->Vel[d];
