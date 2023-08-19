@@ -938,7 +938,11 @@ void init_cooling_and_star_formation(int CoolingOn, int StarformationOn, Cosmolo
 
         double u4 = sfr_params.temp_to_u/meanweight * 1.0e4;
 
-        double dens = 1.0e6 * CP->RhoCrit;
+        double dens;
+        if (CP->ComovingIntegrationOn)
+            dens = 1.0e6 * CP->RhoCrit;
+        else
+            dens = 1.0e6 * (1.0e-29 / units.UnitDensity_in_cgs);
 
         double ne = 1.0;
 
@@ -957,6 +961,7 @@ void init_cooling_and_star_formation(int CoolingOn, int StarformationOn, Cosmolo
         sfr_params.PhysDensThresh = x / pow(1 - x, 2) *
                     (sfr_params.FactorSN * sfr_params.EgySpecSN - (1 - sfr_params.FactorSN) * sfr_params.EgySpecCold)
                     / (sfr_params.MaxSfrTimescale * coolrate);
+        /* NYC note: this part matches exactly with gadget4 */
 
         message(0, "A0= %g  \n", sfr_params.FactorEVP);
         message(0, "Computed: PhysDensThresh= %g  (int units)         %g h^2 cm^-3\n", sfr_params.PhysDensThresh,
