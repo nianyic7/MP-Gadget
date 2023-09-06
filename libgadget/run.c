@@ -648,8 +648,13 @@ run(const int RestartSnapNum, const inttime_t ti_init, const struct header_data 
             /* ComovingIntegration TODO: need to fix AvgGasMass because it is obviously wrong
                It is used to set a cap on the maximum gas mass after metal return, shouldn't have a huge effect for now?*/
             if(All.MetalReturnOn) {
-                double AvgGasMass = All.CP.OmegaBaryon * 3 * All.CP.Hubble * All.CP.Hubble / (8 * M_PI * All.CP.GravInternal) * pow(PartManager->BoxSize, 3) / header->NTotalInit[0];
-                metal_return(&Act, ddecomp, &All.CP, afac, AvgGasMass);
+                double AvgGasMass;
+                if (All.CP.ComovingIntegrationOn)
+                    AvgGasMass = All.CP.OmegaBaryon * 3 * All.CP.Hubble * All.CP.Hubble / (8 * M_PI * All.CP.GravInternal) * pow(PartManager->BoxSize, 3) / header->NTotalInit[0];
+                else
+                    AvgGasMass = 1.0e20; // effectively no cap
+                /* atime should be dloga not afac in metal return, since it is ONLY used to compute stellar age in Myr*/
+                metal_return(&Act, ddecomp, &All.CP, atime, AvgGasMass);
             }
             message(0, "**** Passed Metal Return ****\n");
 

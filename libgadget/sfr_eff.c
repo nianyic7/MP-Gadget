@@ -453,7 +453,7 @@ cooling_direct(int i, const double redshift, const double a3inv, const double hu
 {
     /*  the actual time-step */
     double dloga = get_dloga_for_bin(P[i].TimeBinHydro, P[i].Ti_drift);
-    double dtime = dloga / hubble;
+    double dtime = dloga / hubble; /* NYC: dtime here is consistent with gadget4, dloga is different but hubble compensates for it */
 
     double ne = SPHP(i).Ne;	/* electron abundance (gives ionization state and mean molecular weight) */
 
@@ -952,6 +952,7 @@ void init_cooling_and_star_formation(int CoolingOn, int StarformationOn, Cosmolo
          * It probably make sense to set the parameters with
          * a metalicity dependence.
          * */
+         /* NYC: redshift=0 only for initialization of density thr; this is intentional */
         const double tcool = GetCoolingTime(0, egyhot, dens, &uvbg, &ne, 0.0);
 
         const double coolrate = egyhot / tcool / dens;
