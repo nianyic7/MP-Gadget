@@ -549,7 +549,7 @@ blackhole_accretion_ngbiter(TreeWalkQueryBHAccretion * I,
     if(P[other].ID == I->ID) return;
 
     /* we have a black hole merger. Now we use 2 times GravitationalSoftening as merging criteria, previously we used the SPH smoothing length. */
-    if(P[other].Type == 5 && r < (2*FORCE_SOFTENING(0,1)/2.8))
+    if(P[other].Type == 5 && r < (2*FORCE_SOFTENING(0,5)/2.8))
     {
         O->encounter = 1; // mark the event when two BHs encounter each other
 
