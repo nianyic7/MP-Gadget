@@ -110,11 +110,16 @@ petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, MPI_
 
     int ThisTask;
     int NTask;
+    pm->Mesh2Task[0] = (int *) mymalloc2("Mesh2Task", 2*sizeof(int) * Nmesh);
+    pm->Mesh2Task[1] = pm->Mesh2Task[0] + Nmesh;
     MPI_Comm_rank(comm, &ThisTask);
     MPI_Comm_size(comm, &NTask);
+    
     int ndevices;
     cudaGetDeviceCount(&ndevices);
     cudaSetDevice(ThisTask % ndevices);
+
+    message(0, "Cuda Devices %d \n", ndevices);
 
     /* try to find a square 2d decomposition */
     /* CUDA NOTE: CufftMp only supports square decomposition, 
@@ -125,7 +130,8 @@ petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, MPI_
         endrun(0, "Error: The number of MPI ranks has to be a perfect square for CufftMp\n");
     }
 
-    message(0, "Using 2D Task mesh %td x %td \n", nranks1d, nranks1d);
+    message(0, "Using 2D Task mesh %d x %d \n", nranks1d, nranks1d);
+    
     // Define custom data distribution
     int64 nx               = Nmesh;
     int64 ny               = Nmesh;
@@ -134,44 +140,57 @@ petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, MPI_
     int64 nz_complex       = (nz/2+1);
     int64 nz_real_padded   = 2*nz_complex;
 
-    // Describe the data distribution using boxes
-    auto make_box = [](int64 lower[3], int64 upper[3], int64 strides[3]) {
-        Box3D box;
-        for(int i = 0; i < 3; i++) {
-            box.lower[i] = lower[i];
-            box.upper[i] = upper[i];
-            box.strides[i] = strides[i];
-        }
-        return box;
-    };
+    // create 2D cartesian MPI comm without pfft
+    int dims[2] = {nranks1d, nranks1d};
+    int periods[2] = {0, 0};  // non-periodic in both dimensions
+    // Allow the ranks to be reordered by MPI for efficiency
+    // Actually don't allow reordering for now to be safe
+    int reorder = 0;
+    MPI_Cart_create(comm, 2, dims, periods, reorder, &pm->priv->comm_cart_2d);
+    if (pm->priv->comm_cart_2d == MPI_COMM_NULL) {
+        endrun(0, "Error: comm_cart_2d is MPI_COMM_NULL\n");
+    }
+    MPI_Cart_get(pm->priv->comm_cart_2d, 2, pm->NTask2d, periods, pm->ThisTask2d);
+    message(1, "Task = %d ThisTask2d = (%d, %d) Ntask2d = (%d, %d) \n", 
+        ThisTask, pm->ThisTask2d[0], pm->ThisTask2d[1], pm->NTask2d[0], pm->NTask2d[1]);
 
+
+    // compute offset, size and strides
     auto displacement = [](int64 length, int rank, int size) {
         int ranks_cutoff = length % size;
-        return (rank < ranks_cutoff ? rank * (length / size + 1) : ranks_cutoff * (length / size + 1) + (rank - ranks_cutoff) * (length / size));
+        int chunk_size = length / size;
+        return (rank < ranks_cutoff ? rank * (chunk_size + 1) : ranks_cutoff * (chunk_size + 1) + (rank - ranks_cutoff) * chunk_size);
     };
-
-    // Input data are real pencils in X & Y, along Z
-    // Strides are packed and in-place (i.e., real is padded)
-    Box3D box_real;
-    Box3D box_complex;
-    int i,j;
-    i = ThisTask / nranks1d;
-    j = ThisTask % nranks1d;
-
-    int64 lower[3]   = {displacement(nx, i,   nranks1d), displacement(ny, j,   nranks1d), 0};
-    int64 upper[3]   = {displacement(nx, i+1, nranks1d), displacement(ny, j+1, nranks1d), nz_real};
-    int64 strides[3] = {(upper[1]-lower[1])*nz_real_padded, nz_real_padded, 1};
-    box_real = make_box(lower, upper, strides);
-
-    // Output data are complex pencils in X & Z, along Y (picked arbitrarily)
-    // Strides are packed
-    // For best performances, the local dimension in the input (Z, here) and output (Y, here) should be different
-    // to ensure cuFFTMp will only perform two communication phases.
-    // If Z was also local in the output, cuFFTMp would perform three communication phases, decreasing performances.
-    int64 lower_c[3]   = {displacement(nx, i,   nranks1d), 0,  displacement(nz_complex, j,   nranks1d)};
-    int64 upper_c[3]   = {displacement(nx, i+1, nranks1d), ny, displacement(nz_complex, j+1, nranks1d)};
-    int64 strides_c[3] = {(upper[1]-lower[1])*(upper[2]-lower[2]), (upper[2]-lower[2]), 1};
-    box_complex = make_box(lower_c, upper_c, strides_c);
+    
+    // update region properties
+    auto update_region = [](int64 lower[3], int64 upper[3], int64 strides[3], PetaPMRegion &region) {
+        region.totalsize = 1;
+        for (int i = 0; i < 3; i++) {
+            region.offset[i]  = lower[i];
+            region.upper[i]   = upper[i];
+            region.size[i]    = upper[i] - lower[i];
+            region.strides[i] = strides[i];
+            region.totalsize *= region.size[i];
+        }
+        region->buffer = NULL;
+    };
+    
+    int i = ThisTask / nranks1d;
+    int j = ThisTask % nranks1d;
+    
+    // real region setup
+    // note the petapm->region has non-padded strides, while cufft takes in padded strides
+    int64 lower_real[3]   = {displacement(nx, i, nranks1d), displacement(ny, j, nranks1d), 0};
+    int64 upper_real[3]   = {displacement(nx, i+1, nranks1d), displacement(ny, j+1, nranks1d), nz_real};
+    int64 strides_real[3] = {(upper_real[1] - lower_real[1]) * nz_real_padded, nz_real_padded, 1};
+    int64 strides_real_nopad[3] = {(upper_real[1] - lower_real[1]) * nz_real, nz_real, 1};
+    update_region(lower_real, upper_real, strides_real_nopad, pm->real_space_region);
+    
+    // complex region setup
+    int64 lower_fourier[3]   = {displacement(nx, i, nranks1d), 0, displacement(nz_complex, j, nranks1d)};
+    int64 upper_fourier[3]   = {displacement(nx, i+1, nranks1d), ny, displacement(nz_complex, j+1, nranks1d)};
+    int64 strides_fourier[3] = {(upper_fourier[1] - lower_fourier[1]) * (upper_fourier[2] - lower_fourier[2]), (upper_fourier[2] - lower_fourier[2]), 1};
+    update_region(lower_fourier, upper_fourier, strides_fourier, pm->fourier_space_region);
 
 
     //===============================================================================================
@@ -187,8 +206,8 @@ petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, MPI_
     // C2R plans only support CUFFT_XT_FORMAT_DISTRIBUTED_OUTPUT ans always perform a CUFFT_INVERSE transform
     // So, in both, the "input" box should be the real box and the "output" box should be the complex box
 
-    cufftXtSetDistribution(pm->priv->plan_forw, 3, box_real.lower, box_real.upper, box_complex.lower, box_complex.upper, box_real.strides, box_complex.strides);
-    cufftXtSetDistribution(pm->priv->plan_back, 3, box_complex.lower, box_complex.upper, box_real.lower, box_real.upper, box_complex.strides, box_real.strides);
+    cufftXtSetDistribution(pm->priv->plan_forw, 3, lower_real, upper_real, lower_fourier, upper_fourier, strides_real, strides_fourier);
+    cufftXtSetDistribution(pm->priv->plan_back, 3, lower_real, upper_real, lower_fourier, upper_fourier, strides_real, strides_fourier);
 
     // Set the stream
     cufftSetStream(pm->priv->plan_forw, pm->priv->stream);
@@ -198,7 +217,56 @@ petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, MPI_
     size_t workspace;
     cufftMakePlan3d(pm->priv->plan_forw, Nmesh, Nmesh, Nmesh, CUFFT_R2C, &workspace);
     cufftMakePlan3d(pm->priv->plan_back, Nmesh, Nmesh, Nmesh, CUFFT_C2R, &workspace);
+
+    // Allocate GPU memory, copy CPU data to GPU
+    // Data is initially distributed according to CUFFT_XT_FORMAT_DISTRIBUTED_INPUT, i.e., box_real
+    cudaLibXtDesc *desc;
+    cufftXtMalloc(pm->priv->plan_forw, &desc, CUFFT_XT_FORMAT_DISTRIBUTED_INPUT);
+    pm->priv->fftsize = desc->descriptor->size[0];
     //===============================================================================================
+
+    message(1, "Task %d NGPUs=%d, pfftsize=%d \n", ThisTask, desc->descriptor->nGPUs, pm->priv->fftsize);
+    /* now lets fill up the mesh2task arrays */
+    #if 1
+        message(1, "Real Region %d lower=(%td %td %td) upper=(%td %td %td) strides=(%td %td %td)\n", ThisTask,
+                pm->real_space_region.offset[0],
+                pm->real_space_region.offset[1],
+                pm->real_space_region.offset[2],
+                pm->real_space_region.upper[0],
+                pm->real_space_region.upper[1],
+                pm->real_space_region.upper[2],
+                pm->real_space_region.strides[0],
+                pm->real_space_region.strides[1],
+                pm->real_space_region.strides[2]);
+        message(1, "Complex Region %d lower=(%td %td %td) upper=(%td %td %td) strides=(%td %td %td)\n", ThisTask,
+                pm->fourier_space_region.offset[0],
+                pm->fourier_space_region.offset[1],
+                pm->fourier_space_region.offset[2],
+                pm->fourier_space_region.upper[0],
+                pm->fourier_space_region.upper[1],
+                pm->fourier_space_region.upper[2],
+                pm->fourier_space_region.strides[0],
+                pm->fourier_space_region.strides[1],
+                pm->fourier_space_region.strides[2]);
+    #endif
+    
+        int * tmp = (int *) mymalloc("tmp", sizeof(int) * Nmesh);
+        int k;
+        for(k = 0; k < 2; k ++) {
+            for(i = 0; i < Nmesh; i ++) {
+                tmp[i] = 0;
+            }
+            for(i = 0; i < pm->real_space_region.size[k]; i ++) {
+                tmp[i + pm->real_space_region.offset[k]] = pm->ThisTask2d[k];
+            }
+            /* which column / row hosts this tile? */
+            /* FIXME: this is very inefficient */
+            MPI_Allreduce(tmp, pm->Mesh2Task[k], Nmesh, MPI_INT, MPI_MAX, comm);
+            // for(i = 0; i < Nmesh; i ++) {
+            //     message(0, "Mesh2Task[%d][%d] == %d\n", k, i, pm->Mesh2Task[k][i]);
+            // }
+        }
+        myfree(tmp);
 }
 
 void
@@ -206,6 +274,7 @@ petapm_destroy(PetaPM * pm)
 {
     cufftDestroy(pm->priv->plan_forw);
     cufftDestroy(pm->priv->plan_back);
+    cudaStreamDestroy(pm->priv->stream);
     MPI_Comm_free(&pm->priv->comm_cart_2d);
     myfree(pm->Mesh2Task[0]);
 }
@@ -262,8 +331,10 @@ static void pm_apply_transfer_function(PetaPM * pm,
         cufftComplex * dst, petapm_transfer_func H
         ){
     size_t ip = 0;
+    message(1, "FLAG 1-1***************** \n");
 
     PetaPMRegion * region = &pm->fourier_space_region;
+    message(1, "******region size %d\n", region->totalsize);
 
 #pragma omp parallel for
     for(ip = 0; ip < region->totalsize; ip ++) {
@@ -312,14 +383,12 @@ cufftComplex * petapm_force_r2c(PetaPM * pm,
     walltime_measure("/PMgrav/Verify");
 #endif
 
-    cufftComplex * complx = (cufftComplex *) mymalloc("PMcomplex", pm->priv->fftsize * sizeof(double));
-
     // CUDA TODO: figure out if this is needed
     // Allocate GPU memory, copy CPU data to GPU
     // Data is initially distributed according to CUFFT_XT_FORMAT_INPLACE
     cufftXtMalloc(pm->priv->plan_forw, &pm->priv->desc, CUFFT_XT_FORMAT_INPLACE);
     // copy real array to gpu
-    cufftXtMemcpy(pm->priv->plan_back, (void*)pm->priv->desc, (void*)real, CUFFT_COPY_HOST_TO_DEVICE);
+    cufftXtMemcpy(pm->priv->plan_forw, pm->priv->desc, real, CUFFT_COPY_HOST_TO_DEVICE);
     // execute the plan
     cufftXtExecDescriptor(pm->priv->plan_forw, pm->priv->desc, pm->priv->desc, CUFFT_FORWARD);
     myfree(real);
@@ -334,15 +403,14 @@ cufftComplex * petapm_force_r2c(PetaPM * pm,
     /*Do any analysis that may be required before the transfer function is applied*/
     petapm_transfer_func global_readout = global_functions->global_readout;
     if(global_readout)
-        pm_apply_transfer_function(pm, complx, rho_k, global_readout);
+        pm_apply_transfer_function(pm, (cufftComplex*) pm->priv->desc->descriptor->data[0], rho_k, global_readout);
     if(global_functions->global_analysis)
         global_functions->global_analysis(pm);
     /*Apply the transfer function*/
     petapm_transfer_func global_transfer = global_functions->global_transfer;
-    pm_apply_transfer_function(pm, complx, rho_k, global_transfer);
+    pm_apply_transfer_function(pm, (cufftComplex*) pm->priv->desc->descriptor->data[0], rho_k, global_transfer);
     walltime_measure("/PMgrav/r2c");
 
-    myfree(complx);
     return rho_k;
 }
 
@@ -359,19 +427,24 @@ petapm_force_c2r(PetaPM * pm,
         petapm_transfer_func transfer = f->transfer;
         petapm_readout_func readout = f->readout;
 
-        cufftComplex * complx = (cufftComplex *) mymalloc("PMcomplex", pm->priv->fftsize * sizeof(double));
+        message(1, "FLAG 1***************** \n");
+
         /* apply the greens function turn rho_k into potential in fourier space */
-        pm_apply_transfer_function(pm, rho_k, complx, transfer);
+        pm_apply_transfer_function(pm, rho_k, (cufftComplex*) pm->priv->desc->descriptor->data[0], transfer);
         walltime_measure("/PMgrav/calc");
-        // double * real = (double * ) mymalloc2("PMreal", pm->priv->fftsize * sizeof(double));
-        /* CUDA TODO: BUT WHERE DO I INPUT THE ACTUAL ARRAY? */
+        message(1, "FLAG 2***************** \n");
+        // execute c2r
         cufftXtExecDescriptor(pm->priv->plan_back, pm->priv->desc, pm->priv->desc, CUFFT_INVERSE);
-        double * real = (double * ) pm->priv->desc->descriptor->data[0];
+        cudaStreamSynchronize(pm->priv->stream);
+        // copy data back to cpu
+        double * real = (double * ) mymalloc2("PMreal", pm->priv->fftsize * sizeof(double));
+        cufftXtMemcpy(pm->priv->plan_back, real, pm->priv->desc, CUFFT_COPY_DEVICE_TO_HOST);
+        cufftXtFree(pm->priv->desc);
 
         walltime_measure("/PMgrav/c2r");
         if(f == functions) // Once
             report_memory_usage("PetaPM");
-        myfree(complx);
+
         /* read out the potential: this will copy and free real.*/
         layout_build_and_exchange_cells_to_local(pm, &pm->priv->layout, pm->priv->meshbuf, real);
         walltime_measure("/PMgrav/comm");
@@ -644,7 +717,7 @@ layout_build_and_exchange_cells_to_fft(
             L->BufRecv, L->NcRecv, L->DcRecv, MPI_DOUBLE,
             L->comm);
 
-#if 0
+#if 1
     double massExport = 0;
     for(i = 0; i < L->NcExport; i ++) {
         massExport += L->BufSend[i];
@@ -722,6 +795,7 @@ layout_iterate_cells(PetaPM * pm,
                      double * real)
 {
     int i;
+    message(1, "******** NpImport %d \n", L->NpImport);
 #pragma omp parallel for
     for(i = 0; i < L->NpImport; i ++) {
         struct Pencil * p = &L->PencilRecv[i];
@@ -738,6 +812,8 @@ layout_iterate_cells(PetaPM * pm,
             }
             linear0 += ix * pm->real_space_region.strides[k];
         }
+        
+        
         int j;
         for(j = 0; j < p->len; j ++) {
             int iz = p->offset[2] + j;
@@ -846,16 +922,6 @@ static void pm_iterate(PetaPM * pm, pm_iterator iterator, PetaPMRegion * regions
     }
 }
 
-void petapm_region_init_strides(PetaPMRegion * region) {
-    int k;
-    size_t rt = 1;
-    for(k = 2; k >= 0; k --) {
-        region->strides[k] = rt;
-        rt = region->size[k] * rt;
-    }
-    region->totalsize = rt;
-    region->buffer = NULL;
-}
 
 static int pos_get_target(PetaPM * pm, const int pos[2]) {
     int k;
