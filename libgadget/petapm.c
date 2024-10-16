@@ -162,8 +162,8 @@ petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, MPI_
         return (rank < ranks_cutoff ? rank * (chunk_size + 1) : ranks_cutoff * (chunk_size + 1) + (rank - ranks_cutoff) * chunk_size);
     };
     
-    // update region properties
-    auto update_region = [](int64 lower[3], int64 upper[3], int64 strides[3], PetaPMRegion &region) {
+    // update region properties, also have a redundant box struct for now to use box_iterator, will merge it to region
+    auto update_region_and_box = [](int64 lower[3], int64 upper[3], int64 strides[3], PetaPMRegion &region, Box3D &box) {
         region.totalsize = 1;
         for (int i = 0; i < 3; i++) {
             region.offset[i]  = lower[i];
@@ -171,8 +171,12 @@ petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, MPI_
             region.size[i]    = upper[i] - lower[i];
             region.strides[i] = strides[i];
             region.totalsize *= region.size[i];
+            // init box3d
+            box.lower = lower[i];
+            box.upper = upper[i];
+            box.strides[i] = strides[i];
         }
-        region->buffer = NULL;
+        region.buffer = NULL;
     };
     
     int i = ThisTask / nranks1d;
@@ -184,6 +188,7 @@ petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, MPI_
     int64 upper_real[3]   = {displacement(nx, i+1, nranks1d), displacement(ny, j+1, nranks1d), nz_real};
     int64 strides_real[3] = {(upper_real[1] - lower_real[1]) * nz_real_padded, nz_real_padded, 1};
     int64 strides_real_nopad[3] = {(upper_real[1] - lower_real[1]) * nz_real, nz_real, 1};
+
     update_region(lower_real, upper_real, strides_real_nopad, pm->real_space_region);
     
     // complex region setup
@@ -326,15 +331,36 @@ petapm_force_init(
     return regions;
 }
 
+
+
+__global__
+void scaling_kernel(BoxIterator<cufftComplex> begin, BoxIterator<cufftComplex> end, int rank, int size, size_t nx, size_t ny, size_t nz, bool printing = true) {
+    const int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    begin += tid;
+    if(begin < end) {
+        // begin.x(), begin.y() and begin.z() are the global 3D coordinate of the data pointed by the iterator
+        // begin->x and begin->y are the real and imaginary part of the corresponding cufftComplex element
+        if(tid < 10 && printing) {
+            printf("GPU data (after first transform): global 3D index [%d %d %d], local index %d, rank %d is (%f,%f)\n", 
+                (int)begin.x(), (int)begin.y(), (int)begin.z(), (int)begin.i(), rank, begin->x, begin->y);
+        }
+        *begin = {begin->x / (float)(nx * ny * nz), begin->y / (float)(nx * ny * nz)};
+    }
+};
+
+
+
+
+
 static void pm_apply_transfer_function(PetaPM * pm,
         cufftComplex * src,
         cufftComplex * dst, petapm_transfer_func H
         ){
     size_t ip = 0;
-    message(1, "FLAG 1-1***************** \n");
+    
 
     PetaPMRegion * region = &pm->fourier_space_region;
-    message(1, "******region size %d\n", region->totalsize);
+    message(1, "**region size %d; pfftsize %d \n", region->totalsize, pm->priv->fftsize);
 
 #pragma omp parallel for
     for(ip = 0; ip < region->totalsize; ip ++) {
@@ -361,8 +387,14 @@ static void pm_apply_transfer_function(PetaPM * pm,
         pos[0] = kpos[2];
         pos[1] = kpos[0];
         pos[2] = kpos[1];
+        message(1, "ip=%d\n", ip);
+
         dst[ip].x = src[ip].x;
         dst[ip].y = src[ip].y;
+
+        message(1, "dst=%f \n", dst[ip].x);
+        message(1, "src=%f \n", src[ip].x);
+        
         if(H) {
             H(pm, k2, pos, &dst[ip]);
         }
@@ -389,6 +421,8 @@ cufftComplex * petapm_force_r2c(PetaPM * pm,
     cufftXtMalloc(pm->priv->plan_forw, &pm->priv->desc, CUFFT_XT_FORMAT_INPLACE);
     // copy real array to gpu
     cufftXtMemcpy(pm->priv->plan_forw, pm->priv->desc, real, CUFFT_COPY_HOST_TO_DEVICE);
+    message(1, "Real array first element %f\n", real[0]);
+    
     // execute the plan
     cufftXtExecDescriptor(pm->priv->plan_forw, pm->priv->desc, pm->priv->desc, CUFFT_FORWARD);
     myfree(real);
@@ -399,16 +433,19 @@ cufftComplex * petapm_force_r2c(PetaPM * pm,
     //=============================== End of R2C =============================================
     //========================== Begin Transfer Function =====================================
     cufftComplex * rho_k = (cufftComplex * ) mymalloc2("PMrho_k", pm->priv->fftsize * sizeof(double));
-
+    cufftComplex *complex_data = (cufftComplex *) pm->priv->desc->descriptor->data[0];
+    message(1, "First element: real = %f, imag = %f\n", complex_data[0].x, complex_data[0].y);
+    
+        
     /*Do any analysis that may be required before the transfer function is applied*/
     petapm_transfer_func global_readout = global_functions->global_readout;
     if(global_readout)
-        pm_apply_transfer_function(pm, (cufftComplex*) pm->priv->desc->descriptor->data[0], rho_k, global_readout);
+        pm_apply_transfer_function(pm, complex_data, rho_k, global_readout);
     if(global_functions->global_analysis)
         global_functions->global_analysis(pm);
     /*Apply the transfer function*/
     petapm_transfer_func global_transfer = global_functions->global_transfer;
-    pm_apply_transfer_function(pm, (cufftComplex*) pm->priv->desc->descriptor->data[0], rho_k, global_transfer);
+    pm_apply_transfer_function(pm, complex_data, rho_k, global_transfer);
     walltime_measure("/PMgrav/r2c");
 
     return rho_k;
@@ -426,8 +463,6 @@ petapm_force_c2r(PetaPM * pm,
     for (f = functions; f->name; f ++) {
         petapm_transfer_func transfer = f->transfer;
         petapm_readout_func readout = f->readout;
-
-        message(1, "FLAG 1***************** \n");
 
         /* apply the greens function turn rho_k into potential in fourier space */
         pm_apply_transfer_function(pm, rho_k, (cufftComplex*) pm->priv->desc->descriptor->data[0], transfer);
@@ -920,6 +955,17 @@ static void pm_iterate(PetaPM * pm, pm_iterator iterator, PetaPMRegion * regions
     for(i = 0; i < CPS->NumPart; i ++) {
         pm_iterate_one(pm, i, iterator, regions, Nregions);
     }
+}
+
+void petapm_region_init_strides(PetaPMRegion * region) {
+    int k;
+    size_t rt = 1;
+    for(k = 2; k >= 0; k --) {
+        region->strides[k] = rt;
+        rt = region->size[k] * rt;
+    }
+    region->totalsize = rt;
+    region->buffer = NULL;
 }
 
 
