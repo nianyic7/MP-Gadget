@@ -103,7 +103,7 @@ GADGET_OBJS =  \
 	 gravshort-tree.o gravshort-pair.o hydra.o  timefac.o \
 	 gravpm.o powerspectrum.o \
 	 forcetree.o \
-	 petapm.o gravity.o \
+	 petapm.o pm_kernel.o gravity.o \
 	 densitykernel.o walltime.o\
 	 runtests.o \
 	 neutrinos_lra.o \

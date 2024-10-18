@@ -1,7 +1,6 @@
 #ifndef __PETAPM_H__
 #define __PETAPM_H__
-#include <cufftMp.h>   // NC:library change
-#include <box_iterator.hpp>
+#include <cufftMp.h>
 
 #include "powerspectrum.h"
 #include "box_iterator.hpp"

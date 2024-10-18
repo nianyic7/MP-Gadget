@@ -2,13 +2,10 @@
 #
 AR ?= ar
 MPICC ?= mpic++
+NVOPTIMIZE ?=  
 LOW_PRECISION ?= double
 
 OPTIMIZE ?= -O2 -g -fopenmp -Wall
-GSL_INCL ?= $(shell pkg-config --cflags gsl)
-GSL_LIBS ?= $(shell pkg-config --libs gsl)
-#BOOST_INCL ?= $(shell pkg-config --cflags boost)
-#BOOST_LIBS ?= $(shell pkg-config --libs boost)
 
 ifneq ($(findstring -DUSE_CFITSIO, $(OPT)),)
     # If found, set FITSIO_INCL with the cfitsio flags
@@ -25,20 +22,23 @@ ifneq ($(findstring -DUSE_CUDA, $(OPT)),)
     NVSHMEM_LIBS ?= -lnvshmem_host
     NVCC ?= nvcc
     NVOPTIMIZE ?= -O3
+    MPI_INCL ?=
 endif
 
 OPTIONS = $(OPTIMIZE) $(OPT)
 GADGET_TESTDATA_ROOT = $(CURDIR)/../
 
-CFLAGS = $(OPTIONS) $(GSL_INCL) $(BOOST_INCL) $(FITSIO_INCL) $(CUDA_INCL) $(CUFFTMP_INCL) $(NVSHMEM_INCL)
+CFLAGS = $(OPTIONS) $(BOOST_INCL) $(FITSIO_INCL) $(CUDA_INCL) $(CUFFTMP_INCL) $(NVSHMEM_INCL)
 CFLAGS += -I../depends/include
 CFLAGS += -I../
 CFLAGS += "-DLOW_PRECISION=$(LOW_PRECISION)"
 #For tests
 TCFLAGS = $(CFLAGS) -DGADGET_TESTDATA_ROOT=\"$(GADGET_TESTDATA_ROOT)\"
 
-BUNDLEDLIBS = -lbigfile-mpi -lbigfile -lpfft_omp -lfftw3_mpi -lfftw3_omp -lfftw3
-LIBS  = -lm  $(BOOST_LIBS) $(GSL_LIBS) $(FITSIO_LIBS) $(CUDA_LIBS) $(CUFFTMP_LIBS) $(NVSHMEM_LIBS)
+CUDAFLAGS = $(BOOST_INCL) $(CUDA_INCL) $(CUFFTMP_INCL) $(NVSHMEM_INCL) $(MPI_INCL)
+
+BUNDLEDLIBS = -lbigfile-mpi -lbigfile 
+LIBS  = -lm $(BOOST_LIBS) $(FITSIO_LIBS) $(CUDA_LIBS) $(CUFFTMP_LIBS) $(NVSHMEM_LIBS)
 LIBS += -L../depends/lib $(BUNDLEDLIBS)
 V ?= 0
 
@@ -48,6 +48,10 @@ V ?= 0
 	mkdir -p `dirname $@`; \
 	echo Compiling $<; $$cmd
 
-# Rule to compile .cu files (using nvcc)
-.objs/%.o: %.cu
-	$(NVCC) $(NVOPTIMIZE) -c $< -o $@
+
+.objs/%.o: %.cu Makefile $(CONFIG)
+	@cmd="$(NVCC) -MMD -c -o $@ $(CUDAFLAGS) $<"; \
+	if test "x$(V)" = "x1" ; then echo $$cmd; fi; \
+	echo Compiling $<; $$cmd
+	
+

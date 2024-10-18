@@ -7,9 +7,11 @@
 
 #include "types.h"
 #include "petapm.h"
+#include "pm_kernel.cuh"
 
 #include "utils.h"
 #include "walltime.h"
+
 
 static void
 layout_prepare(PetaPM * pm,
@@ -107,7 +109,6 @@ petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, MPI_
     pm->CellSize = BoxSize / Nmesh;
     pm->comm = comm;
 
-
     int ThisTask;
     int NTask;
     pm->Mesh2Task[0] = (int *) mymalloc2("Mesh2Task", 2*sizeof(int) * Nmesh);
@@ -172,8 +173,8 @@ petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, MPI_
             region.strides[i] = strides[i];
             region.totalsize *= region.size[i];
             // init box3d
-            box.lower = lower[i];
-            box.upper = upper[i];
+            box.lower[i] = lower[i];
+            box.upper[i] = upper[i];
             box.strides[i] = strides[i];
         }
         region.buffer = NULL;
@@ -189,14 +190,13 @@ petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, MPI_
     int64 strides_real[3] = {(upper_real[1] - lower_real[1]) * nz_real_padded, nz_real_padded, 1};
     int64 strides_real_nopad[3] = {(upper_real[1] - lower_real[1]) * nz_real, nz_real, 1};
 
-    update_region(lower_real, upper_real, strides_real_nopad, pm->real_space_region);
+    update_region_and_box(lower_real, upper_real, strides_real_nopad, pm->real_space_region, pm->box_real);
     
     // complex region setup
     int64 lower_fourier[3]   = {displacement(nx, i, nranks1d), 0, displacement(nz_complex, j, nranks1d)};
     int64 upper_fourier[3]   = {displacement(nx, i+1, nranks1d), ny, displacement(nz_complex, j+1, nranks1d)};
     int64 strides_fourier[3] = {(upper_fourier[1] - lower_fourier[1]) * (upper_fourier[2] - lower_fourier[2]), (upper_fourier[2] - lower_fourier[2]), 1};
-    update_region(lower_fourier, upper_fourier, strides_fourier, pm->fourier_space_region);
-
+    update_region_and_box(lower_fourier, upper_fourier, strides_fourier, pm->fourier_space_region, pm->box_complex);
 
     //===============================================================================================
     cudaStreamCreate(&pm->priv->stream);
@@ -210,7 +210,6 @@ petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, MPI_
     // R2C plans only support CUFFT_XT_FORMAT_DISTRIBUTED_INPUT and always perform a CUFFT_FORWARD transform
     // C2R plans only support CUFFT_XT_FORMAT_DISTRIBUTED_OUTPUT ans always perform a CUFFT_INVERSE transform
     // So, in both, the "input" box should be the real box and the "output" box should be the complex box
-
     cufftXtSetDistribution(pm->priv->plan_forw, 3, lower_real, upper_real, lower_fourier, upper_fourier, strides_real, strides_fourier);
     cufftXtSetDistribution(pm->priv->plan_back, 3, lower_real, upper_real, lower_fourier, upper_fourier, strides_real, strides_fourier);
 
@@ -232,17 +231,17 @@ petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, MPI_
 
     message(1, "Task %d NGPUs=%d, pfftsize=%d \n", ThisTask, desc->descriptor->nGPUs, pm->priv->fftsize);
     /* now lets fill up the mesh2task arrays */
-    #if 1
-        message(1, "Real Region %d lower=(%td %td %td) upper=(%td %td %td) strides=(%td %td %td)\n", ThisTask,
-                pm->real_space_region.offset[0],
-                pm->real_space_region.offset[1],
-                pm->real_space_region.offset[2],
-                pm->real_space_region.upper[0],
-                pm->real_space_region.upper[1],
-                pm->real_space_region.upper[2],
-                pm->real_space_region.strides[0],
-                pm->real_space_region.strides[1],
-                pm->real_space_region.strides[2]);
+    #if 0
+        message(1, "Real Box3d %d lower=(%td %td %td) upper=(%td %td %td) strides=(%td %td %td)\n", ThisTask,
+                pm->box_real.lower[0],
+                pm->box_real.lower[1],
+                pm->box_real.lower[2],
+                pm->box_real.upper[0],
+                pm->box_real.upper[1],
+                pm->box_real.upper[2],
+                pm->box_real.strides[0],
+                pm->box_real.strides[1],
+                pm->box_real.strides[2]);
         message(1, "Complex Region %d lower=(%td %td %td) upper=(%td %td %td) strides=(%td %td %td)\n", ThisTask,
                 pm->fourier_space_region.offset[0],
                 pm->fourier_space_region.offset[1],
@@ -254,7 +253,6 @@ petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, MPI_
                 pm->fourier_space_region.strides[1],
                 pm->fourier_space_region.strides[2]);
     #endif
-    
         int * tmp = (int *) mymalloc("tmp", sizeof(int) * Nmesh);
         int k;
         for(k = 0; k < 2; k ++) {
@@ -330,25 +328,6 @@ petapm_force_init(
     walltime_measure("/PMgrav/init");
     return regions;
 }
-
-
-
-__global__
-void scaling_kernel(BoxIterator<cufftComplex> begin, BoxIterator<cufftComplex> end, int rank, int size, size_t nx, size_t ny, size_t nz, bool printing = true) {
-    const int tid = threadIdx.x + blockIdx.x * blockDim.x;
-    begin += tid;
-    if(begin < end) {
-        // begin.x(), begin.y() and begin.z() are the global 3D coordinate of the data pointed by the iterator
-        // begin->x and begin->y are the real and imaginary part of the corresponding cufftComplex element
-        if(tid < 10 && printing) {
-            printf("GPU data (after first transform): global 3D index [%d %d %d], local index %d, rank %d is (%f,%f)\n", 
-                (int)begin.x(), (int)begin.y(), (int)begin.z(), (int)begin.i(), rank, begin->x, begin->y);
-        }
-        *begin = {begin->x / (float)(nx * ny * nz), begin->y / (float)(nx * ny * nz)};
-    }
-};
-
-
 
 
 
@@ -429,25 +408,27 @@ cufftComplex * petapm_force_r2c(PetaPM * pm,
 
      // CUDA TODO: need to check if the output complex array is transpose
      // need to verify
-     // can verify by using both version of the code
     //=============================== End of R2C =============================================
     //========================== Begin Transfer Function =====================================
-    cufftComplex * rho_k = (cufftComplex * ) mymalloc2("PMrho_k", pm->priv->fftsize * sizeof(double));
-    cufftComplex *complex_data = (cufftComplex *) pm->priv->desc->descriptor->data[0];
-    message(1, "First element: real = %f, imag = %f\n", complex_data[0].x, complex_data[0].y);
+    int ThisTask;
+    int NTask;
+    MPI_Comm_rank(pm->comm, &ThisTask);
+    MPI_Comm_size(pm->comm, &NTask);
     
+    cufftComplex * rho_k = (cufftComplex * ) mymalloc2("PMrho_k", pm->priv->fftsize * sizeof(double));
+
+    launch_potential_transfer(pm->box_complex, (cufftComplex *) pm->priv->desc->descriptor->data[0], ThisTask, NTask, pm, pm->priv->stream);
+    message(1, "Simple kernel suceeded \n");
         
     /*Do any analysis that may be required before the transfer function is applied*/
-    petapm_transfer_func global_readout = global_functions->global_readout;
-    if(global_readout)
-        pm_apply_transfer_function(pm, complex_data, rho_k, global_readout);
-    if(global_functions->global_analysis)
-        global_functions->global_analysis(pm);
-    /*Apply the transfer function*/
-    petapm_transfer_func global_transfer = global_functions->global_transfer;
-    pm_apply_transfer_function(pm, complex_data, rho_k, global_transfer);
+    /* CUDA Note: global readout and analysis is NULL unless CP->MassiveNuLinRespOn*/
+    /* CUDA TODO: add back the CP->MassiveNuLinRespOn function later*/
+    
+    // /*Apply the transfer function*/
+    /* global transfer is potential transfer in gravpm*/
+    // petapm_transfer_func global_transfer = global_functions->global_transfer;
+    // pm_apply_transfer_function(pm, complex_data, rho_k, global_transfer);
     walltime_measure("/PMgrav/r2c");
-
     return rho_k;
 }
 
@@ -458,16 +439,17 @@ petapm_force_c2r(PetaPM * pm,
         const int Nregions,
         PetaPMFunctions * functions)
 {
-
+    // For grav the functions are: potential, forcex, forcey, forcez, 
+    // where the potential has no transfer function, only readout
+    // as the potential transfer is applied in r2c
     PetaPMFunctions * f = functions;
     for (f = functions; f->name; f ++) {
         petapm_transfer_func transfer = f->transfer;
         petapm_readout_func readout = f->readout;
 
         /* apply the greens function turn rho_k into potential in fourier space */
-        pm_apply_transfer_function(pm, rho_k, (cufftComplex*) pm->priv->desc->descriptor->data[0], transfer);
+        // pm_apply_transfer_function(pm, rho_k, (cufftComplex*) pm->priv->desc->descriptor->data[0], transfer);
         walltime_measure("/PMgrav/calc");
-        message(1, "FLAG 2***************** \n");
         // execute c2r
         cufftXtExecDescriptor(pm->priv->plan_back, pm->priv->desc, pm->priv->desc, CUFFT_INVERSE);
         cudaStreamSynchronize(pm->priv->stream);
@@ -479,14 +461,16 @@ petapm_force_c2r(PetaPM * pm,
         walltime_measure("/PMgrav/c2r");
         if(f == functions) // Once
             report_memory_usage("PetaPM");
-
+        message(1, "FREED DESC ***************** \n");
         /* read out the potential: this will copy and free real.*/
         layout_build_and_exchange_cells_to_local(pm, &pm->priv->layout, pm->priv->meshbuf, real);
         walltime_measure("/PMgrav/comm");
 
         pm_iterate(pm, readout, regions, Nregions);
         walltime_measure("/PMgrav/readout");
-    }
+//    }
+    
+        message(1, "READ OUT DONE ***************** \n");
 }
 
 void petapm_force_finish(PetaPM * pm) {
@@ -994,6 +978,11 @@ static int pencil_cmp_target(const void * v1, const void * v2) {
         ((p2->meshbuf_first < p1->meshbuf_first) - (p1->meshbuf_first < p2->meshbuf_first));
 }
 
+
+
+
+/********************************************************************************************/
+
 #ifdef DEBUG
 static void verify_density_field(PetaPM * pm, double * real, double * meshbuf, const size_t meshsize) {
     /* verify the density field */
@@ -1027,6 +1016,9 @@ static void verify_density_field(PetaPM * pm, double * real, double * meshbuf, c
     message(0, "total Region mass err = %g CIC mass err = %g Particle mass = %g\n", totmass_Region / totmass_Part - 1, totmass_CIC / totmass_Part - 1, totmass_Part);
 }
 #endif
+
+
+
 
 
 

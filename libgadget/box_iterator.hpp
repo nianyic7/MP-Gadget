@@ -175,27 +175,12 @@ private:
 
 };
 
-template<typename T> __host__ __device__ __forceinline__ 
-BoxIterator<T> BoxIteratorBegin(Box3D box, T* ptr) {
-    return BoxIterator<T>(0, box, ptr);
-};
-
-template<typename T> __host__ __device__ __forceinline__
-BoxIterator<T> BoxIteratorEnd(Box3D box, T* ptr) {
-    return BoxIterator<T>( (box.upper[0] - box.lower[0]) * (box.upper[1] - box.lower[1]) * (box.upper[2] - box.lower[2]), box, ptr);
-};
-
-template<typename T>
-std::pair<BoxIterator<T>,BoxIterator<T>> BoxIterators(Box3D box, T* ptr) {
-    return {BoxIteratorBegin<T>(box, ptr),BoxIteratorEnd<T>(box, ptr)};
-}
-
-int64 slabs_displacement(int64 length, int rank, int size) {
+inline int64 slabs_displacement(int64 length, int rank, int size) {
     int ranks_cutoff = length % size;
     return (rank < ranks_cutoff ? rank * (length / size + 1) : ranks_cutoff * (length / size + 1) + (rank - ranks_cutoff) * (length / size));
 }
 
-Box3D buildBox3D(cufftXtSubFormat format, cufftType type, int rank, int size, int64 nx, int64 ny, int64 nz) {
+inline Box3D buildBox3D(cufftXtSubFormat format, cufftType type, int rank, int size, int64 nx, int64 ny, int64 nz) {
     if(format == CUFFT_XT_FORMAT_INPLACE) {
         int64 x_start      = slabs_displacement(nx, rank,   size);
         int64 x_end        = slabs_displacement(nx, rank+1, size);
@@ -215,6 +200,22 @@ Box3D buildBox3D(cufftXtSubFormat format, cufftType type, int rank, int size, in
             {0, y_start, 0}, {my_nx, y_end, my_nz}, {(y_end-y_start) * my_nz_padded, my_nz_padded, 1}
         };
     }
+}
+
+
+template<typename T> __host__ __device__ __forceinline__ 
+BoxIterator<T> BoxIteratorBegin(Box3D box, T* ptr) {
+    return BoxIterator<T>(0, box, ptr);
+};
+
+template<typename T> __host__ __device__ __forceinline__
+BoxIterator<T> BoxIteratorEnd(Box3D box, T* ptr) {
+    return BoxIterator<T>( (box.upper[0] - box.lower[0]) * (box.upper[1] - box.lower[1]) * (box.upper[2] - box.lower[2]), box, ptr);
+};
+
+template<typename T>
+std::pair<BoxIterator<T>,BoxIterator<T>> BoxIterators(Box3D box, T* ptr) {
+    return {BoxIteratorBegin<T>(box, ptr),BoxIteratorEnd<T>(box, ptr)};
 }
 
 template<typename T>
