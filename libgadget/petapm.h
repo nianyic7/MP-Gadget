@@ -142,7 +142,8 @@ cufftComplex * petapm_force_r2c(PetaPM * pm,
         PetaPMGlobalFunctions * global_functions
         ); // NC: changed returned complex type
 void petapm_force_c2r(PetaPM * pm,
-        cufftComplex * rho_k, PetaPMRegion * regions,
+            cufftComplex * rho_k,
+               PetaPMRegion * regions,
         const int Nregions,
         PetaPMFunctions * functions); // NC: changed input complex type
 void petapm_force_finish(PetaPM * pm);
