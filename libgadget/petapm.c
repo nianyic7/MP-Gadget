@@ -48,10 +48,10 @@ static void verify_density_field(PetaPM * pm, double * real, double * meshbuf, c
 static MPI_Datatype MPI_PENCIL;
 
 /*Used only in MP-GenIC*/
-cufftComplex *
+cufftDoubleComplex *
 petapm_alloc_rhok(PetaPM * pm)
 {
-    cufftComplex * rho_k = (cufftComplex * ) mymalloc("PMrho_k", pm->priv->fftsize * sizeof(double));
+    cufftDoubleComplex * rho_k = (cufftDoubleComplex * ) mymalloc("PMrho_k", pm->priv->fftsize * sizeof(double));
     memset(rho_k, 0, pm->priv->fftsize * sizeof(double));
     return rho_k;
 }
@@ -199,9 +199,17 @@ petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, MPI_
     update_region_and_box(lower_fourier, upper_fourier, strides_fourier, pm->fourier_space_region, pm->box_complex);
 
     //===============================================================================================
+    cufftResult CudaRes;
     cudaStreamCreate(&pm->priv->stream);
-    cufftCreate(&pm->priv->plan_forw);
-    cufftCreate(&pm->priv->plan_back);
+    CudaRes = cufftCreate(&pm->priv->plan_forw);
+    if (CudaRes != CUFFT_SUCCESS) {
+        message(0, "Error in cufftCreate(&pm->priv->plan_forw): %d\n", CudaRes);
+    }
+    CudaRes = cufftCreate(&pm->priv->plan_back);
+    if (CudaRes != CUFFT_SUCCESS) {
+        message(0, "Error in cufftCreate(&pm->priv->plan_back): %d\n", CudaRes);
+    }
+    
     // Attach the MPI communicator to the plans
     cufftMpAttachComm(pm->priv->plan_forw, CUFFT_COMM_MPI, &comm);
     cufftMpAttachComm(pm->priv->plan_back, CUFFT_COMM_MPI, &comm);
@@ -219,8 +227,8 @@ petapm_init(PetaPM * pm, double BoxSize, double Asmth, int Nmesh, double G, MPI_
 
     // Make the plan
     size_t workspace;
-    cufftMakePlan3d(pm->priv->plan_forw, Nmesh, Nmesh, Nmesh, CUFFT_R2C, &workspace);
-    cufftMakePlan3d(pm->priv->plan_back, Nmesh, Nmesh, Nmesh, CUFFT_C2R, &workspace);
+    cufftMakePlan3d(pm->priv->plan_forw, Nmesh, Nmesh, Nmesh, CUFFT_D2Z, &workspace);
+    cufftMakePlan3d(pm->priv->plan_back, Nmesh, Nmesh, Nmesh, CUFFT_Z2D, &workspace);
 
     // Allocate GPU memory, copy CPU data to GPU
     // Data is initially distributed according to CUFFT_XT_FORMAT_DISTRIBUTED_INPUT, i.e., box_real
@@ -291,8 +299,8 @@ typedef void (* pm_iterator)(PetaPM * pm, int i, double * mesh, double weight);
 static void pm_iterate(PetaPM * pm, pm_iterator iterator, PetaPMRegion * regions, const int Nregions);
 /* apply transfer function to value, kpos array is in x, y, z order */
 static void pm_apply_transfer_function(PetaPM * pm,
-        cufftComplex * src,
-        cufftComplex * dst, petapm_transfer_func H);
+        cufftDoubleComplex * src,
+        cufftDoubleComplex * dst, petapm_transfer_func H);
 
 static void put_particle_to_mesh(PetaPM * pm, int i, double * mesh, double weight);
 /*
@@ -333,8 +341,8 @@ petapm_force_init(
 
 
 static void pm_apply_transfer_function(PetaPM * pm,
-        cufftComplex * src,
-        cufftComplex * dst, petapm_transfer_func H
+        cufftDoubleComplex * src,
+        cufftDoubleComplex * dst, petapm_transfer_func H
         ){
     size_t ip = 0;
     PetaPMRegion * region = &pm->fourier_space_region;
@@ -380,7 +388,7 @@ static void pm_apply_transfer_function(PetaPM * pm,
 
 }
 
-cufftComplex *
+cufftDoubleComplex *
 petapm_force_r2c(PetaPM * pm,
         PetaPMGlobalFunctions * global_functions
         ) {
@@ -427,16 +435,16 @@ petapm_force_r2c(PetaPM * pm,
     /* global transfer is potential transfer in gravpm*/
     // petapm_transfer_func global_transfer = global_functions->global_transfer;
     // pm_apply_transfer_function(pm, complex_data, rho_k, global_transfer);
-    launch_potential_transfer(pm->box_complex, (cufftComplex *) pm->priv->desc->descriptor->data[0], ThisTask, NTask, pm, pm->priv->stream);
+    launch_potential_transfer(pm->box_complex, (cufftDoubleComplex *) pm->priv->desc->descriptor->data[0], ThisTask, NTask, pm, pm->priv->stream);
     message(1, "Simple kernel suceeded \n");
     walltime_measure("/PMgrav/r2c");
-    cufftComplex * rho_k = (cufftComplex * ) mymalloc2("PMrho_k", pm->priv->fftsize * sizeof(double));
+    cufftDoubleComplex * rho_k = (cufftDoubleComplex * ) mymalloc2("PMrho_k", pm->priv->fftsize * sizeof(double));
     return rho_k;
 }
 
 void
 petapm_force_c2r(PetaPM * pm,
-        cufftComplex * rho_k,
+        cufftDoubleComplex * rho_k,
         PetaPMRegion * regions,
         const int Nregions,
         PetaPMFunctions * functions)
@@ -463,7 +471,7 @@ petapm_force_c2r(PetaPM * pm,
     if (res != CUFFT_SUCCESS) {
         message(1, "Error in cufftXtMemcpy desc_fx: %d\n", res);
     }
-    launch_force_x_transfer(pm->box_complex, (cufftComplex *) desc_fx->descriptor->data[0], 
+    launch_force_x_transfer(pm->box_complex, (cufftDoubleComplex *) desc_fx->descriptor->data[0], 
                             ThisTask, NTask, pm, pm->priv->stream);
     cufftXtExecDescriptor(pm->priv->plan_back, desc_fx, desc_fx, CUFFT_INVERSE);
     cudaStreamSynchronize(pm->priv->stream);
@@ -481,7 +489,7 @@ petapm_force_c2r(PetaPM * pm,
     cudaLibXtDesc *desc_fy;
     cufftXtMalloc(pm->priv->plan_back, &desc_fy, CUFFT_XT_FORMAT_DISTRIBUTED_OUTPUT);
     cufftXtMemcpy(pm->priv->plan_back, desc_fy, pm->priv->desc, CUFFT_COPY_DEVICE_TO_DEVICE);
-    launch_force_y_transfer(pm->box_complex, (cufftComplex *) desc_fy->descriptor->data[0], ThisTask, NTask, pm, pm->priv->stream);
+    launch_force_y_transfer(pm->box_complex, (cufftDoubleComplex *) desc_fy->descriptor->data[0], ThisTask, NTask, pm, pm->priv->stream);
     cufftXtExecDescriptor(pm->priv->plan_back, desc_fy, desc_fy, CUFFT_INVERSE);
     cudaStreamSynchronize(pm->priv->stream);
     cufftXtMemcpy(pm->priv->plan_back, real_fy, desc_fy, CUFFT_COPY_DEVICE_TO_HOST);
@@ -498,7 +506,7 @@ petapm_force_c2r(PetaPM * pm,
     cudaLibXtDesc *desc_fz;
     cufftXtMalloc(pm->priv->plan_back, &desc_fz, CUFFT_XT_FORMAT_DISTRIBUTED_OUTPUT);
     cufftXtMemcpy(pm->priv->plan_back, desc_fz, pm->priv->desc, CUFFT_COPY_DEVICE_TO_DEVICE);
-    launch_force_z_transfer(pm->box_complex, (cufftComplex *) desc_fz->descriptor->data[0], ThisTask, NTask, pm, pm->priv->stream);
+    launch_force_z_transfer(pm->box_complex, (cufftDoubleComplex *) desc_fz->descriptor->data[0], ThisTask, NTask, pm, pm->priv->stream);
     cufftXtExecDescriptor(pm->priv->plan_back, desc_fz, desc_fz, CUFFT_INVERSE);
     cudaStreamSynchronize(pm->priv->stream);
     cufftXtMemcpy(pm->priv->plan_back, real_fz, desc_fz, CUFFT_COPY_DEVICE_TO_HOST);
@@ -536,7 +544,7 @@ void petapm_force(PetaPM * pm, petapm_prepare_func prepare,
         void * userdata) {
     int Nregions;
     PetaPMRegion * regions = petapm_force_init(pm, prepare, pstruct, &Nregions, userdata);
-    cufftComplex * rho_k = petapm_force_r2c(pm, global_functions);
+    cufftDoubleComplex * rho_k = petapm_force_r2c(pm, global_functions);
     if(functions)
         petapm_force_c2r(pm, rho_k, regions, Nregions, functions);
     myfree(rho_k);

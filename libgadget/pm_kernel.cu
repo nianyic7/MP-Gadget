@@ -33,7 +33,7 @@ __device__ double diff_kernel(double w) {
 
 
 __global__
-void potential_transfer_kernel(BoxIterator<cufftComplex> begin, BoxIterator<cufftComplex> end, PetaPM *pm) {
+void potential_transfer_kernel(BoxIterator<cufftDoubleComplex> begin, BoxIterator<cufftDoubleComplex> end, PetaPM *pm) {
     const int tid = threadIdx.x + blockIdx.x * blockDim.x;
     begin += tid;
 
@@ -81,7 +81,7 @@ void potential_transfer_kernel(BoxIterator<cufftComplex> begin, BoxIterator<cuff
 
 
 __global__ 
-void force_transfer_kernel(BoxIterator<cufftComplex> begin, BoxIterator<cufftComplex> end, PetaPM *pm, int ik) {
+void force_transfer_kernel(BoxIterator<cufftDoubleComplex> begin, BoxIterator<cufftDoubleComplex> end, PetaPM *pm, int ik) {
     double tmp0;
     double tmp1;
     const int tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -117,7 +117,7 @@ void force_transfer_kernel(BoxIterator<cufftComplex> begin, BoxIterator<cufftCom
 }
 
 
-extern "C" void launch_potential_transfer(Box3D box_complex, cufftComplex* data, int rank, int size, PetaPM *pm, cudaStream_t stream) {
+extern "C" void launch_potential_transfer(Box3D box_complex, cufftDoubleComplex* data, int rank, int size, PetaPM *pm, cudaStream_t stream) {
     auto [begin_d, end_d] = BoxIterators(box_complex, data);
     const size_t num_elements = std::distance(begin_d, end_d);
     const size_t num_threads  = 256;
@@ -126,7 +126,7 @@ extern "C" void launch_potential_transfer(Box3D box_complex, cufftComplex* data,
 }
 
 
-extern "C" void launch_force_x_transfer(Box3D box_complex, cufftComplex* data, int rank, int size, PetaPM *pm, cudaStream_t stream) {
+extern "C" void launch_force_x_transfer(Box3D box_complex, cufftDoubleComplex* data, int rank, int size, PetaPM *pm, cudaStream_t stream) {
     auto [begin_d, end_d] = BoxIterators(box_complex, data);
     const size_t num_elements = std::distance(begin_d, end_d);
     const size_t num_threads  = 256;
@@ -134,7 +134,7 @@ extern "C" void launch_force_x_transfer(Box3D box_complex, cufftComplex* data, i
     force_transfer_kernel<<<num_blocks, num_threads, 0, stream>>>(begin_d, end_d, pm, 0);
 }
 
-extern "C" void launch_force_y_transfer(Box3D box_complex, cufftComplex* data, int rank, int size, PetaPM *pm, cudaStream_t stream) {
+extern "C" void launch_force_y_transfer(Box3D box_complex, cufftDoubleComplex* data, int rank, int size, PetaPM *pm, cudaStream_t stream) {
     auto [begin_d, end_d] = BoxIterators(box_complex, data);
     const size_t num_elements = std::distance(begin_d, end_d);
     const size_t num_threads  = 256;
@@ -142,7 +142,7 @@ extern "C" void launch_force_y_transfer(Box3D box_complex, cufftComplex* data, i
     force_transfer_kernel<<<num_blocks, num_threads, 0, stream>>>(begin_d, end_d, pm, 1);
 }
 
-extern "C" void launch_force_z_transfer(Box3D box_complex, cufftComplex* data, int rank, int size, PetaPM *pm, cudaStream_t stream) {
+extern "C" void launch_force_z_transfer(Box3D box_complex, cufftDoubleComplex* data, int rank, int size, PetaPM *pm, cudaStream_t stream) {
     auto [begin_d, end_d] = BoxIterators(box_complex, data);
     const size_t num_elements = std::distance(begin_d, end_d);
     const size_t num_threads  = 256;

@@ -20,11 +20,11 @@ static int pm_mark_region_for_node(int startno, int rid, int * RegionInd, const 
 static void convert_node_to_region(PetaPM * pm, PetaPMRegion * r, struct NODE * Nodes);
 
 static int hybrid_nu_gravpm_is_active(int i);
-static void potential_transfer(PetaPM * pm, int64_t k2, int kpos[3], cufftComplex * value);
+static void potential_transfer(PetaPM * pm, int64_t k2, int kpos[3], cufftDoubleComplex * value);
 static void compute_neutrino_power(PetaPM * pm);
-static void force_x_transfer(PetaPM * pm, int64_t k2, int kpos[3], cufftComplex * value);
-static void force_y_transfer(PetaPM * pm, int64_t k2, int kpos[3], cufftComplex * value);
-static void force_z_transfer(PetaPM * pm, int64_t k2, int kpos[3], cufftComplex * value);
+static void force_x_transfer(PetaPM * pm, int64_t k2, int kpos[3], cufftDoubleComplex * value);
+static void force_y_transfer(PetaPM * pm, int64_t k2, int kpos[3], cufftDoubleComplex * value);
+static void force_z_transfer(PetaPM * pm, int64_t k2, int kpos[3], cufftDoubleComplex * value);
 static void readout_potential(PetaPM * pm, int i, double * mesh, double weight);
 static void readout_force_x(PetaPM * pm, int i, double * mesh, double weight);
 static void readout_force_y(PetaPM * pm, int i, double * mesh, double weight);
@@ -326,7 +326,7 @@ static void compute_neutrino_power(PetaPM * pm) {
 /* Compute the power spectrum of the fourier transformed grid in value.
  * Store it in the PowerSpectrum structure */
 void
-powerspectrum_add_mode(Power * PowerSpectrum, const int64_t k2, const int kpos[3], cufftComplex * const value, const double invwindow, double Nmesh)
+powerspectrum_add_mode(Power * PowerSpectrum, const int64_t k2, const int kpos[3], cufftDoubleComplex * const value, const double invwindow, double Nmesh)
 {
     if(k2 == 0) {
         /* Save zero mode corresponding to the mean as the normalisation factor.*/
@@ -360,7 +360,7 @@ powerspectrum_add_mode(Power * PowerSpectrum, const int64_t k2, const int kpos[3
 
 /*Just read the power spectrum, without changing the input value.*/
 void
-measure_power_spectrum(PetaPM * pm, int64_t k2, int kpos[3], cufftComplex *value) {
+measure_power_spectrum(PetaPM * pm, int64_t k2, int kpos[3], cufftDoubleComplex *value) {
     double f = 1.0;
     /* the CIC deconvolution kernel is
      *
@@ -381,7 +381,7 @@ measure_power_spectrum(PetaPM * pm, int64_t k2, int kpos[3], cufftComplex *value
 
 /*  */
 static void
-potential_transfer(PetaPM * pm, int64_t k2, int kpos[3], cufftComplex *value)
+potential_transfer(PetaPM * pm, int64_t k2, int kpos[3], cufftDoubleComplex *value)
 {
     const double asmth2 = pow((2 * M_PI) * pm->Asmth / pm->Nmesh,2);
     double f = 1.0;
@@ -472,7 +472,7 @@ static int hybrid_nu_gravpm_is_active(int i) {
         return 1;
 }
 
-static void force_transfer(PetaPM * pm, int k, cufftComplex * value) {
+static void force_transfer(PetaPM * pm, int k, cufftDoubleComplex * value) {
     double tmp0;
     double tmp1;
     /*
@@ -486,13 +486,13 @@ static void force_transfer(PetaPM * pm, int k, cufftComplex * value) {
     value[0].x = tmp0;
     value[0].y = tmp1;
 }
-static void force_x_transfer(PetaPM * pm, int64_t k2, int kpos[3], cufftComplex * value) {
+static void force_x_transfer(PetaPM * pm, int64_t k2, int kpos[3], cufftDoubleComplex * value) {
     force_transfer(pm, kpos[0], value);
 }
-static void force_y_transfer(PetaPM * pm, int64_t k2, int kpos[3], cufftComplex * value) {
+static void force_y_transfer(PetaPM * pm, int64_t k2, int kpos[3], cufftDoubleComplex * value) {
     force_transfer(pm, kpos[1], value);
 }
-static void force_z_transfer(PetaPM * pm, int64_t k2, int kpos[3], cufftComplex * value) {
+static void force_z_transfer(PetaPM * pm, int64_t k2, int kpos[3], cufftDoubleComplex * value) {
     force_transfer(pm, kpos[2], value);
 }
 static void readout_potential(PetaPM * pm, int i, double * mesh, double weight) {

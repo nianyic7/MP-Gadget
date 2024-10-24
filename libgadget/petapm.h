@@ -98,7 +98,7 @@ typedef struct {
     int64_t NumPart;
 } PetaPMParticleStruct;
 
-typedef void (*petapm_transfer_func)(PetaPM * pm, int64_t k2, int kpos[3], cufftComplex * value); //NC:change to complex type
+typedef void (*petapm_transfer_func)(PetaPM * pm, int64_t k2, int kpos[3], cufftDoubleComplex * value); //NC:change to complex type
 typedef void (*petapm_readout_func)(PetaPM * pm, int i, double * mesh, double weight);
 typedef PetaPMRegion * (*petapm_prepare_func)(PetaPM * pm, PetaPMParticleStruct * pstruct, void * data, int *Nregions);
 
@@ -138,11 +138,11 @@ PetaPMRegion * petapm_force_init(PetaPM * pm,
         PetaPMParticleStruct * pstruct,
         int * Nregions,
         void * userdata);
-cufftComplex * petapm_force_r2c(PetaPM * pm,
+cufftDoubleComplex * petapm_force_r2c(PetaPM * pm,
         PetaPMGlobalFunctions * global_functions
         ); // NC: changed returned complex type
 void petapm_force_c2r(PetaPM * pm,
-            cufftComplex * rho_k,
+            cufftDoubleComplex * rho_k,
                PetaPMRegion * regions,
         const int Nregions,
         PetaPMFunctions * functions); // NC: changed input complex type
@@ -153,5 +153,5 @@ PetaPMRegion * petapm_get_real_region(PetaPM * pm);
 int petapm_mesh_to_k(PetaPM * pm, int i);
 int *petapm_get_thistask2d(PetaPM * pm);
 int *petapm_get_ntask2d(PetaPM * pm);
-cufftComplex * petapm_alloc_rhok(PetaPM * pm); // NC: changed returned complex type
+cufftDoubleComplex * petapm_alloc_rhok(PetaPM * pm); // NC: changed returned complex type
 #endif
